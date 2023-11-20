@@ -1,0 +1,7 @@
+
+## Ignore JetBrains
+.idea/
+!.idea/icon*.png
+*.iml
+build/
+modules.xml
