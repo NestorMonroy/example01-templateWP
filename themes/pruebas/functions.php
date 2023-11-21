@@ -1,6 +1,6 @@
 <?php
 
-function enqueue_style(){
+function enqueue_styles(){
 	wp_enqueue_style(
 		'normalize-css',
 		get_template_directory_uri().'/public/css/normalize.css',
@@ -24,4 +24,23 @@ function enqueue_style(){
 	);
 }
 
-add_action('wp_enqueue_scripts','wp_enqueue_styles');
+add_action('wp_enqueue_style','enqueue_styles');
+
+function enqueue_scripts(){
+	wp_enqueue_scripts(
+		'public-js',
+		get_template_directory_uri().'/public/js/atr-public.js',
+		['jquery', 'bootstrap-min'],
+		'1.0.0',
+		true
+	);
+	wp_enqueue_scripts(
+		'bootstrap-min',
+		get_template_directory_uri().'/helpers/bootstrap-5.3.2/js/bootstrap.min.js',
+		['jquery'],
+		'5.3.2',
+		true
+	);
+}
+
+add_action('wp_enqueue_scripts','enqueue_scripts');
