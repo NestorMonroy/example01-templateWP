@@ -33,11 +33,11 @@ class ATR_MASTER{
 		/**
 	     * La clase responsable de definir todas las acciones en el area de administracion
 	     */
-	    require_once ATR_DIR_PATH.'includes/class-atr-admin.php';
+	    require_once ATR_DIR_PATH.'admin/class-atr-admin.php';
 		/**
 	     * La clase responsable de definir todas las acciones en el area del lado del cliente/publico
 	     */
-	    require_once ATR_DIR_PATH.'includes/class-atr-public.php';
+	    require_once ATR_DIR_PATH.'public/class-atr-public.php';
     }
 
 	private function set_idiomas(){

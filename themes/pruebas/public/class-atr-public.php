@@ -54,5 +54,4 @@ class ATR_Public {
 	}
 
 
-
 }

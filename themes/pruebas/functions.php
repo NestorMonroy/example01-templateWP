@@ -6,7 +6,6 @@ define('ATR_DIR_PATH', $atr_dir_path);
 define('ATR_DIR_URI', $atr_dir_uri);
 
 require_once ATR_DIR_PATH.'includes/class-atr-master.php';
-
 function atr_run_master(){
 	$atr_master = new ATR_MASTER;
 	$atr_master ->run();
