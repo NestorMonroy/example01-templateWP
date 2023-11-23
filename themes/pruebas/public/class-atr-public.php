@@ -6,8 +6,8 @@ class ATR_Public {
 
 	/*Gestion de las funciones, de lado del tema*/
 	function __construct($theme_name, $version){
-		$this -> $theme_name = $theme_name;
-		$this -> $version = $version;
+		$this -> theme_name = $theme_name;
+		$this -> version = $version;
 
 	}
 
@@ -34,7 +34,6 @@ class ATR_Public {
 			'all'
 		);
 	}
-
 
 	public function enqueue_scripts(){
 		wp_enqueue_script(

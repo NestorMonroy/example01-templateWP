@@ -38,6 +38,7 @@ class ATR_MASTER{
 	     * La clase responsable de definir todas las acciones en el area del lado del cliente/publico
 	     */
 	    require_once ATR_DIR_PATH.'public/class-atr-public.php';
+
     }
 
 	private function set_idiomas(){
@@ -53,6 +54,9 @@ class ATR_MASTER{
 		$this -> cargador = new ATR_Cargador;
 		$this -> atr_admin = new ATR_Admin($this -> get_theme_name(), $this -> get_version());
 		$this -> atr_public = new ATR_Public($this -> get_theme_name(), $this -> get_version());
+
+		error_log("get_theme_name()");
+
 	}
 
 
@@ -70,7 +74,9 @@ class ATR_MASTER{
 	}
 	public function get_version(){
 		return $this -> version;
+
 	}
+
 
 	public function get_cargador(){
 		return $this -> cargador;

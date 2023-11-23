@@ -6,3 +6,5 @@
 build/
 modules.xml
 *.log
+
+.sass-cache/
