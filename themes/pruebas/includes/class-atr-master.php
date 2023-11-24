@@ -67,6 +67,9 @@ class ATR_MASTER{
 		$this -> cargador -> add_action('wp_enqueue_scripts', $this -> atr_public, 'enqueue_styles');
 		$this -> cargador -> add_action('wp_enqueue_scripts', $this -> atr_public, 'enqueue_scripts');
 
+		// add-menu frontend
+		$this -> cargador -> add_action('init', $this -> atr_public, 'atr_menu_frontend');
+
 	}
 
 	public function get_theme_name(){

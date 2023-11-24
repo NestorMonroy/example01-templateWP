@@ -33,6 +33,24 @@ class ATR_Public {
 			'5.3.2',
 			'all'
 		);
+
+		//archivos fontawesome
+		wp_enqueue_style(
+			'fontawesome',
+			ATR_DIR_URI."helpers/fontawesome-5.15.4/css/fontawesome.min.css",
+			array(),
+			'5.15.4',
+			'all'
+		);
+
+		//archivos fontawesome
+		wp_enqueue_style(
+			'brands',
+			ATR_DIR_URI."helpers/fontawesome-5.15.4/css/brands.min.css",
+			array(),
+			'5.15.4',
+			'all'
+		);
 	}
 
 	public function enqueue_scripts(){
@@ -50,7 +68,42 @@ class ATR_Public {
 			'5.3.2',
 			true
 		);
+		//archivos fontawesome js
+		wp_enqueue_script(
+			'fontawesome',
+			ATR_DIR_URI.'helpers/fontawesome-5.15.4/js/fontawesome.min.js',
+			array(),
+			'5.3.2',
+			true
+		);
+		wp_enqueue_script(
+			'brands',
+			ATR_DIR_URI.'helpers/fontawesome-5.15.4/js/brands.min.js',
+			array(),
+			'5.3.2',
+			true
+		);
 	}
 
+	/*
+	 * Aqui cargaremos algunas funciones para ajustar el menu del frontend
+	 * */
+	public function atr_menu_frontend(){
+		//registrar Menu
+		register_nav_menus([
+			'menu_principal' => __('Menú Principal', 'pruebas'),
+			'menu_redes_sociales' => __('Menú Redes Sociales', 'pruebas'),
+		]);
 
+		//Array para agregar las propiedades al logo
+		$logo = [
+			'width' => 230,
+			'heigth' => 80,
+			'flex-heigth' => true,
+			'flex-width' => true,
+			'header-text' => array('pruebas', 'un sitio web de pruebas')
+		];
+
+		add_theme_support('custom-logo', $logo);
+	}
 }
