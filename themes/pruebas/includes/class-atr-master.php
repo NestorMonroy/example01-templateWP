@@ -55,7 +55,7 @@ class ATR_MASTER{
 	 *
 	 * Defina la funcionalidad principal del theme.
 	 *
-	 * Establece el nombre y la versión del theme que se puede utilizar en todo el theme.
+	 * Establece el nombre y la versión del theme que se puede utilizar en el theme.
 	 * Cargar las dependencias, carga de instancias, definir la configuración regional (idioma)
 	 * Establecer los ganchos para el área de administración y
 	 * el lado público del sitio.
