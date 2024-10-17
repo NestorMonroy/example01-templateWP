@@ -44,14 +44,34 @@ create_directories() {
 }
 
 # Función para asignar permisos a directorios
-set_permissions() {
-    # Acepta el propietario y los directorios como argumentos
+set_permissions_dir() {
+    # Acepta el propietario como argumento
     owner=$1
-    shift
+    shift  # Mueve para dejar solo los directorios
+
     for dir in "$@"; do
-        sudo chown "$owner" "$dir" || error_exit "Error al asignar permisos al directorio $dir."
+        # Cambiar propietario recursivamente
+        sudo chown -R "$owner" "$dir" || error_exit "Error al asignar permisos al directorio $dir."
     done
 }
+
+set_permissions() {
+    # Acepta el propietario y los permisos como argumentos
+    owner=$1
+    permissions=$2
+    shift 2  # Mueve dos posiciones para dejar solo los directorios
+
+    for dir in "$@"; do
+        # Cambiar propietario recursivamente
+        sudo chown -R "$owner" "$dir" || error_exit "Error al asignar permisos al directorio $dir."
+
+        # Cambiar permisos si se especificaron
+        if [[ -n "$permissions" ]]; then
+            sudo chmod "$permissions" "$dir" || error_exit "Error al establecer permisos en el directorio $dir."
+        fi
+    done
+}
+
 
 install_archive() {
     local url=$1
