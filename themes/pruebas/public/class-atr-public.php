@@ -17,24 +17,37 @@
  * @var string $theme_name Nombre del tema.
  * @var string $version Versión del tema.
  *
- * Ejemplo de uso:
- * $atr_public = new ATR_Public('mi_tema', '1.0.0');
- * $atr_public->enqueue_styles();
- * $atr_public->enqueue_scripts();
- * $atr_public->atr_menu_frontend();
  */
 class ATR_Public {
+    /**
+     * El nombre del tema.
+     *
+     * @since    1.0.0
+     * @access   private
+     * @var      string    $theme_name  Nombre o identificador único de este tema.
+     */
     private $theme_name; // Nombre del tema
+
+    /**
+     * La versión del tema.
+     *
+     * @since    1.0.0
+     * @access   private
+     * @var      string    $version     Versión actual de este tema, utilizada para el control de actualizaciones.
+     */
     private $version;    // Versión del tema
 
     /**
      * Constructor de la clase ATR_Public
      *
+     * Inicializa el nombre y la versión del tema.
+     *
      * @param string $theme_name Nombre del tema.
      * @param string $version    Versión del tema.
+     *
      * @since    1.0.0
      */
-    function __construct($theme_name, $version){
+    function __construct($theme_name, $version) {
         $this->theme_name = $theme_name;
         $this->version = $version;
     }
@@ -48,8 +61,13 @@ class ATR_Public {
      *
      * @since    1.0.0
      * @access   public
+     *
+     * @return void
+     *
+     * @example
+     * $public->enqueue_styles();
      */
-    public function enqueue_styles(){
+    public function enqueue_styles() {
         wp_enqueue_style(
             'normalize-css',
             ATR_DIR_URI . "public/css/normalize.css",
@@ -99,8 +117,13 @@ class ATR_Public {
      *
      * @since    1.0.0
      * @access   public
+     *
+     * @return void
+     *
+     * @example
+     * $public->enqueue_scripts();
      */
-    public function enqueue_scripts(){
+    public function enqueue_scripts() {
         wp_enqueue_script(
             'public-js',
             ATR_DIR_URI . 'public/js/atr-public.js',
@@ -134,29 +157,70 @@ class ATR_Public {
     }
 
     /**
+     * Devuelve el nombre del tema.
+     *
+     * Este método permite acceder al nombre del tema que fue establecido
+     * en el constructor.
+     *
+     * @return string Nombre del tema.
+     *
+     * @since 1.0.0
+     *
+     * @example
+     * $theme = new ATR_Public('Mi Tema', '1.0.0');
+     * echo $theme->get_theme_name(); // Salida: Mi Tema
+     */
+    public function get_theme_name() {
+        return $this->theme_name;
+    }
+
+    /**
+     * Devuelve la versión del tema.
+     *
+     * Este método permite acceder a la versión del tema que fue establecida
+     * en el constructor.
+     *
+     * @return string Versión del tema.
+     *
+     * @since 1.0.0
+     *
+     * @example
+     * $theme = new ATR_Public('Mi Tema', '1.0.0');
+     * echo $theme->get_version(); // Salida: 1.0.0
+     */
+    public function get_version() {
+        return $this->version;
+    }
+
+
+    /**
      * Registra y configura los menús del frontend.
      *
      * Este método registra el menú principal y el menú de redes sociales,
-     * así como las propiedades del logo del tema, permitiendo personalizar
-     * la apariencia y funcionalidad del sitio.
+     * así como las propiedades del logo del tema.
      *
      * @since    1.0.0
      * @access   public
+     *
+     * @return void
+     *
+     * @example
+     * $public->atr_menu_frontend();
      */
-    public function atr_menu_frontend(){
+    public function atr_menu_frontend() {
         // Registrar Menú
         register_nav_menus([
             'menu_principal' => __('Menú Principal', 'pruebas'),
             'menu_redes_sociales' => __('Menú Redes Sociales', 'pruebas'),
         ]);
 
-        // Array para agregar las propiedades al logo
+        // Configuración del logo
         $logo = [
             'width' => 230,
             'height' => 80,
             'flex-height' => true,
             'flex-width' => true,
-            'header-text' => array('pruebas', 'un sitio web de pruebas')
+            'header-text' => [$this->theme_name, 'Un sitio web de pruebas']
         ];
 
         add_theme_support('custom-logo', $logo);
