@@ -8,3 +8,6 @@ modules.xml
 *.log
 
 .sass-cache/
+
+# Ignore Vagrant
+.vagrant/
