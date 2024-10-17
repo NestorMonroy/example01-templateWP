@@ -1,3 +1,7 @@
 # example01-templateWP
 
-Example
+http://192.168.33.10/
+
+
+http://192.168.33.10/adminer/
+

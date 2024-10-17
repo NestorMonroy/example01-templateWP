@@ -76,7 +76,10 @@ done
 create_directories "${DIRECTORIES[@]}"
 
 # Asignar permisos
-set_permissions "www-data" /srv/www
+set_permissions_dir "www-data" /srv/www
+
+# Asignar permisos a adminer
+set_permissions "vagrant:vagrant" "755" "/usr/share/adminer"
 
 # Instalar WordPress
 install_archive "$WORDPRESS_URL" "$WORDPRESS_DESTINATION" "$WORDPRESS_USER"
