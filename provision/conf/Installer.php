@@ -9,8 +9,8 @@ class Installer {
 	 */
 	public static function symlinkWPContent() {
 		$root = dirname( __DIR__, 2 ); // Obtiene el directorio raíz del proyecto
-		$wp_core_content_folder = "{$root}/htdocs/wordpress/wp-content"; // Ruta del wp-content de WordPress
-		$wp_content_folder = "{$root}/htdocs/wp-content"; // Ruta del nuevo wp-content
+		$wp_core_content_folder = "{$root}/vagrant/htdocs/wordpress/wp-content"; // Ruta del wp-content de WordPress
+		$wp_content_folder = "{$root}/vagrant/htdocs/wp-content"; // Ruta del nuevo wp-content
 
 		// Verificar la existencia de los directorios
 		if (!file_exists($wp_core_content_folder)) {

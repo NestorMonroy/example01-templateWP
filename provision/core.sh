@@ -35,10 +35,11 @@ DIRECTORIES=(
 
 # URL de WordPress
 WORDPRESS_URL="https://wordpress.org/latest.tar.gz"
-WORDPRESS_DESTINATION="/srv/www"
+WORDPRESS_DESTINATION="/vagrant/htdocs"
 WORDPRESS_USER="www-data"
 WORDPRESS_USER_FILE_CONF="/vagrant/provision/conf/wordpress.conf"
 WORDPRESS_CONF="/etc/apache2/sites-available/wordpress.conf"
+
 WORDPRESS_USER_INSTALLER="/vagrant/provision/conf/wordpress_installer.php"
 WORDPRESS_INSTALLER="/srv/www/wordpress_installer.php"
 
@@ -70,7 +71,7 @@ MODULES_TO_ENABLE=(
 db_name="wordpress"
 db_user="wordpress"
 db_password="admin123"
-wp_directory="/srv/www/wordpress"
+wp_directory="/vagrant/htdocs/wordpress"
 
 # Instalar todos los paquetes
 for package in "${PACKAGES[@]}"; do
@@ -81,10 +82,14 @@ done
 create_directories "${DIRECTORIES[@]}"
 
 # Asignar permisos
-set_permissions_dir "www-data" /srv/www
+set_permissions_dir "www-data" /vagrant/htdocs
+set_permissions_dir "www-data" /vagrant/htdocs/wp-content/
+
+set_permissions "vagrant:vagrant" "755" "/vagrant/htdocs/wp-content/"
 
 # Asignar permisos a adminer
 set_permissions "vagrant:vagrant" "755" "/usr/share/adminer"
+
 
 # Instalar WordPress
 install_archive "$WORDPRESS_URL" "$WORDPRESS_DESTINATION" "$WORDPRESS_USER"
@@ -117,7 +122,7 @@ enable_modules "${MODULES_TO_ENABLE[@]}"
 reload_apache
 
 # Configurar la base de datos de WordPress
-setup_database "$db_name" "$db_user" "$db_password"
+  "$db_name" "$db_user" "$db_password"
 
 # Configurar WordPress
 configure_wordpress "$wp_directory" "$db_name" "$db_user" "$db_password"
