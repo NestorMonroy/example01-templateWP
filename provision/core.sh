@@ -1,4 +1,3 @@
-# Incluir el archivo utils.sh
 source /vagrant/provision/utils.sh
 source /vagrant/provision/apache.sh
 source /vagrant/provision/mysql.sh
@@ -40,6 +39,11 @@ WORDPRESS_DESTINATION="/srv/www"
 WORDPRESS_USER="www-data"
 WORDPRESS_USER_FILE_CONF="/vagrant/provision/conf/wordpress.conf"
 WORDPRESS_CONF="/etc/apache2/sites-available/wordpress.conf"
+WORDPRESS_USER_INSTALLER="/vagrant/provision/conf/wordpress_installer.php"
+WORDPRESS_INSTALLER="/srv/www/wordpress_installer.php"
+
+WORDPRESS_USER_C_INSTALLER="/vagrant/provision/conf/Installer.php"
+WORDPRESS_C_INSTALLER="/srv/www/Installer.php"
 
 # URL de Adminer
 ADMINER_URL="https://github.com/vrana/adminer/releases/download/v4.8.1/adminer-4.8.1-en.php"
@@ -87,6 +91,15 @@ install_archive "$WORDPRESS_URL" "$WORDPRESS_DESTINATION" "$WORDPRESS_USER"
 
 # Copiar archivo de configuración de WordPress
 copy_config_file "$WORDPRESS_USER_FILE_CONF" "$WORDPRESS_CONF"
+
+# Copiar el archivo de instalación de WordPress Installer
+copy_config_file "$WORDPRESS_USER_INSTALLER" "$WORDPRESS_INSTALLER"
+
+copy_config_file "$WORDPRESS_USER_C_INSTALLER" "$WORDPRESS_C_INSTALLER"
+
+
+# Ejecutar el script PHP para cambiar wp-content
+php "$WORDPRESS_INSTALLER"
 
 # Instalar Adminer
 download_file "$ADMINER_URL" "$ADMINER_DESTINATION"
