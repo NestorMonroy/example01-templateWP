@@ -24,6 +24,7 @@ PACKAGES=(
     php-mysql
     php-xml
     php-zip
+    php-xdebug
 )
 
 # Lista de directorios a crear

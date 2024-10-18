@@ -198,8 +198,6 @@ class ATR_MASTER{
     private function definir_public_hooks() {
         $this->cargador->add_action('wp_enqueue_scripts', $this->atr_public, 'enqueue_styles');
         $this->cargador->add_action('wp_enqueue_scripts', $this->atr_public, 'enqueue_scripts');
-
-        // Agregar menú frontend
         $this->cargador->add_action('init', $this->atr_public, 'atr_menu_frontend');
     }
 

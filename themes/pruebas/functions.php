@@ -1,11 +1,18 @@
 <?php
 /**
- * Define la ruta y URI del directorio para el tema.
+ * Define la ruta absoluta al directorio del tema.
  *
- * @var string $atr_dir_path La ruta absoluta al directorio del tema.
- * @var string $atr_dir_uri La URI al directorio del tema.
+ * Esta variable se asegura de que la ruta siempre termine con una barra diagonal.
+ *
  */
-$atr_dir_path = (substr(get_template_directory(), -1) === '/') ? get_template_directory() : get_template_directory() . '/';
+$atr_dir_path = rtrim(get_template_directory(), '/') . '/';
+
+/**
+ * Define la URI al directorio del tema.
+ *
+ * Esta variable se asegura de que la URI siempre termine con una barra diagonal.
+ *
+ */
 $atr_dir_uri = (substr(get_template_directory_uri(), -1) === '/') ? get_template_directory_uri() : get_template_directory_uri() . '/';
 
 define('ATR_DIR_PATH', $atr_dir_path);
@@ -24,10 +31,26 @@ define('ATR_DIR_URI', $atr_dir_uri);
  * atr_run_master();
  */
 function atr_run_master() {
-    $atr_master = new ATR_MASTER;
-    $atr_master->run();
+    if (class_exists('ATR_MASTER')) {
+        try {
+            $atr_master = new ATR_MASTER();
+            $atr_master->run();
+        } catch (Exception $e) {
+            // Manejo de errores: puedes registrar el error o mostrar un mensaje
+            error_log('Error al ejecutar ATR_MASTER: ' . $e->getMessage());
+        }
+    } else {
+        // Registro de un error si la clase no existe
+        error_log('La clase ATR_MASTER no está definida.');
+    }
 }
-atr_run_master();
+
+// Llama a la función atr_run_master
+try {
+    atr_run_master();
+} catch (Exception $e) {
+    error_log('No existe la función');
+}
 
 /**
  * Crea un nuevo menú de opciones en el panel de administración de WordPress.
