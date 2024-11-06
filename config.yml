@@ -1,0 +1,20 @@
+###
+# Configuración para el entorno de desarrollo (Vagrant y Docker)
+###
+name: wordpress
+  #production:
+  # Esto se utiliza para obtener automáticamente datos de un entorno de staging (preproducción) o producción
+  #domain: example.com
+  #ssh_port: 12345
+#url: https://example.com
+development:
+  # Los dominios se mapean automáticamente a Vagrant mediante modificaciones en /etc/hosts o Avahi
+  domains:
+    - wordpress.local
+  # Permitir que Vagrant exponga dominios .local en la red local (fuera de la computadora portátil)
+  #avahi: true
+  # Si deseas obtener automáticamente datos de producción, usa 'always' (siempre) o configura
+  # en 'never' (nunca) para silenciar la pregunta 'yes/no' (sí/no) durante 'vagrant up'.
+  #pull_production_db: always
+  #pull_production_plugins: always
+  #pull_production_themes: always

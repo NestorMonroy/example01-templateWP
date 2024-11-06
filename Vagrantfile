@@ -1,62 +1,61 @@
-# -*- mode: ruby -*-
-# vi: set ft=ruby :
+require 'yaml'
+require 'mkmf'
+require 'fileutils'
+require 'socket'
 
-# All Vagrant configuration is done below. The "2" in Vagrant.configure
-# configures the configuration version (we support older styles for
-# backwards compatibility). Please don't change it unless you know what
-# you're doing.
+# Create config file
+config_file = File.join(DIR, 'config.yml')
+
+unless File.exists?(config_file)
+  # Usa el archivo de muestra en su lugar
+  FileUtils.copy config_file
+  puts '==> predeterminado: config.yml no fue encontrado. Copiando configuraciones predeterminadas desde los archivos de muestra...'
+end
+
+site_config = YAML.load_file(config_file)
+
+private_ip = nil
+if File.exists?(private_ip_file)
+  private_ip = File.open(private_ip_file, 'rb') { |file| file.read }
+end
+
+if private_ip.nil? || !private_ip.start_with?('192.168.56.')
+  private_ip = "192.168.56.#{rand(2..254)}"
+  File.write(private_ip_file, private_ip)
+end
+
 Vagrant.configure("2") do |config|
-  # The most common configuration options are documented and commented below.
-  # For a complete reference, please see the online documentation at
-  # https://docs.vagrantup.com.
+  config.vagrant.plugins = ['vagrant-goodhosts']
 
-  # Every Vagrant development environment requires a box. You can search for
-  # boxes at https://vagrantcloud.com/search.
-  config.vm.box = "bento/ubuntu-20.04"
+  config.vm.box = "ubuntu/bionic64"
 
-  # Disable automatic box update checking. If you disable this, then
-  # boxes will only be checked for updates when the user runs
-  # `vagrant box outdated`. This is not recommended.
-  # config.vm.box_check_update = false
+  # Usa la clave SSH de la máquina host para que podamos ingresar a producción
+  config.ssh.forward_agent = true
 
-  # Create a forwarded port mapping which allows access to a specific port
-  # within the machine from a port on the host machine. In the example below,
-  # accessing "localhost:8080" will access port 80 on the guest machine.
-  # NOTE: This will enable public access to the opened port
-  # config.vm.network "forwarded_port", guest: 80, host: 8080
+  # Usa el nombre de la caja como el nombre del host
+  config.vm.hostname = site_config['name']
 
-  # Create a forwarded port mapping which allows access to a specific port
-  # within the machine from a port on the host machine and only allow access
-  # via 127.0.0.1 to disable public access
-  # config.vm.network "forwarded_port", guest: 80, host: 8080, host_ip: "127.0.0.1"
+  # Solo usa avahi si la configuración tiene esto
+  # desarrollo:
+  #   avahi: true
+  if site_config['development']['avahi'] && has_internet? && is_osx?
+    # La caja utiliza avahi-daemon para hacerse disponible en la red local
+    config.vm.network "public_network", bridge: [
+      "en0: Wi-Fi (inalámbrico)",
+      "en1: Wi-Fi (inalámbrico)",
+      "en0: Wi-Fi (AirPort)",
+      "en1: Wi-Fi (AirPort)",
+      "wlan0"
+    ]
+  end
 
-  # Create a private network, which allows host-only access to the machine
-  # using a specific IP.
-  config.vm.network "private_network", ip: "192.168.33.10"
+  # Usa una dirección IP aleatoria
+  # Esto es necesario para actualizar el archivo /etc/hosts
+  config.vm.network :private_network, ip: private_ip
 
-  # Create a public network, which generally matched to bridged network.
-  # Bridged networks make the machine appear as another physical device on
-  # your network.
-  # config.vm.network "public_network"
-  config.vm.hostname = "template"
-  # Share an additional folder to the guest VM. The first argument is
-  # the path on the host to the actual folder. The second argument is
-  # the path on the guest to mount the folder. And the optional third
-  # argument is a set of non-required options.
-  # config.vm.synced_folder "../data", "/vagrant_data"
 
-  # Disable the default share of the current code directory. Doing this
-  # provides improved isolation between the vagrant box and your host
-  # by making sure your Vagrantfile isn't accessible to the vagrant box.
-  # If you use this you may want to enable additional shared subfolders as
-  # shown above.
   config.vm.synced_folder ".", "/vagrant"
-  # config.vm.synced_folder "./themes", "/srv/www/wordpress/wp-content/themes"
 
-  # Provider-specific configuration so you can fine-tune various
-  # backing providers for Vagrant. These expose provider-specific options.
-  # Example for VirtualBox:
-  #
   config.vm.provider "virtualbox" do |vb|
   # Display the VirtualBox GUI when booting the machine
   #  vb.gui = true

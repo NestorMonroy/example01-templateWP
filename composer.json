@@ -1,0 +1,21 @@
+{
+  "name": "",
+  "description": "description",
+  "minimum-stability": "stable",
+  "license": "proprietary",
+  "authors": [
+    {
+      "name": "quauhtli",
+      "email": "email@example.com"
+    }
+  ],
+    "require": {
+      "php": ">=7.4",
+      "vlucas/phpdotenv": "^5.3"
+    },
+    "config": {
+      "optimize-autoloader": true,
+      "preferred-install": "dist",
+      "sort-packages": true
+    }
+}

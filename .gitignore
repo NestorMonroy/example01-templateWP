@@ -47,3 +47,7 @@ htdocs/wp-content/wp-rocket-config
 htdocs/wp-content/upgrade
 htdocs/wp-content/uploads/*
 !htdocs/wp-content/uploads/.gitkeep
+
+/vendor
+.env
+composer.lock
