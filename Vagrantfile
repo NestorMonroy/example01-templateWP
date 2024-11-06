@@ -1,4 +1,3 @@
-# frozen_string_literal: true
 require 'yaml'
 require 'mkmf'
 require 'fileutils'
@@ -13,6 +12,43 @@ DIR = File.dirname(File.expand_path(__FILE__))
 PRIVATE_IP_FILE = File.join(DIR, '.vagrant', 'private_ip')
 CONFIG_FILE = File.join(DIR, 'config.yml')
 SAMPLE_CONFIG_FILE = File.join(DIR, 'config.sample.yml')
+yellow = "\033[33m"
+creset = "\033[0m"
+
+
+# Lista de plugins requeridos
+REQUIRED_PLUGINS = {
+  'vagrant-goodhosts' => nil, # nil significa última versión
+}
+
+# Auto Download Vagrant plugins, soportado desde Vagrant 2.2.0
+def verify_plugins(config)
+  plugins_installed = REQUIRED_PLUGINS.keys.all? { |plugin| Vagrant.has_plugin?(plugin) }
+
+  unless plugins_installed
+    # Verificar archivos .gem locales para todos los plugins
+    REQUIRED_PLUGINS.each do |plugin, version|
+      unless Vagrant.has_plugin?(plugin)
+        local_gem = File.join(DIR, "#{plugin}.gem")
+        if File.file?(local_gem)
+          # Instalar desde archivo local
+          system("vagrant plugin install #{local_gem}")
+          File.delete(local_gem)
+          puts "#{yellow}Se instaló el plugin #{plugin} desde archivo local.#{creset}"
+        else
+          # Instalar desde repositorios oficiales
+          system("vagrant plugin install #{plugin} #{version}")
+          puts "#{yellow}Instalando plugin: #{plugin}#{version ? " (#{version})" : ''}#{creset}"
+        end
+      end
+    end
+    puts "#{yellow}Plugins necesarios fueron instalados. Por favor, ejecute el comando nuevamente.#{creset}"
+    exit
+  end
+
+  # Configurar plugins en Vagrant
+  config.vagrant.plugins = REQUIRED_PLUGINS.keys
+end
 
 # Crear el directorio .vagrant si no existe
 FileUtils.mkdir_p(File.dirname(PRIVATE_IP_FILE))
@@ -47,6 +83,10 @@ end
 
 # Iniciar la configuración de Vagrant
 Vagrant.configure("2") do |config|
+
+  # Verificar y configurar plugins
+  verify_plugins(config)
+
   # Configuración de plugins y SSH
   config.vagrant.plugins = ['vagrant-goodhosts']  # Plugin para gestionar /etc/hosts
   config.ssh.forward_agent = true                 # Permitir reenvío de agente SSH
