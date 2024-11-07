@@ -1,5 +1,19 @@
 #!/usr/bin/env bash
 # Funciones para gestión de paquetes y dependencias
+#
+# Este script proporciona funciones para gestionar paquetes en sistemas Debian/Ubuntu,
+# incluyendo instalación, actualización, remoción y gestión de repositorios.
+#
+# Ejemplo de uso general:
+#   source ./packages.sh
+#
+#   # Actualizar e instalar paquetes
+#   apt_update
+#   install_packages nginx php mysql-server
+#
+#   # Gestionar repositorios
+#   add_ppa "ondrej/php"
+#   hold_package "nginx"
 
 # Importar módulos necesarios
 if [ -z "$CRESET" ]; then
@@ -10,14 +24,19 @@ if [ ! "$(type -t log_info)" ]; then
 fi
 
 # Variables para gestión de paquetes
+# Configuraciones predeterminadas para apt-get y dpkg
 APT_OPTIONS="-y --allow-downgrades --allow-remove-essential --allow-change-held-packages"
 APT_QUIET="-qq"
 DEBIAN_FRONTEND=noninteractive
 
 # Cache de estado de paquetes
+# Almacena el estado de instalación de paquetes para mejorar rendimiento
 declare -A PACKAGE_CACHE
 
 # Limpiar locks de dpkg
+# Uso: cleanup_dpkg_locks
+# Ejemplo:
+#   cleanup_dpkg_locks || exit 1
 cleanup_dpkg_locks() {
     log_info "Limpiando locks de dpkg..."
     local lockfiles=(/var/lib/dpkg/lock*)
@@ -28,6 +47,11 @@ cleanup_dpkg_locks() {
 }
 
 # Actualizar lista de paquetes
+# Uso: apt_update
+# Ejemplo:
+#   if apt_update; then
+#       echo "Repositorios actualizados"
+#   fi
 apt_update() {
     log_info "Actualizando lista de paquetes..."
     cleanup_dpkg_locks
@@ -47,6 +71,9 @@ apt_update() {
 }
 
 # Actualizar paquetes instalados
+# Uso: apt_upgrade
+# Ejemplo:
+#   apt_upgrade || log_error "Fallo en actualización"
 apt_upgrade() {
     log_info "Actualizando paquetes instalados..."
     cleanup_dpkg_locks
@@ -62,6 +89,9 @@ apt_upgrade() {
 }
 
 # Limpiar cache de apt
+# Uso: apt_clean
+# Ejemplo:
+#   apt_clean  # Limpia cache y paquetes no necesarios
 apt_clean() {
     log_info "Limpiando cache de apt..."
 
@@ -75,6 +105,11 @@ apt_clean() {
 }
 
 # Verificar si un paquete está instalado
+# Uso: is_package_installed <nombre_paquete>
+# Ejemplo:
+#   if is_package_installed "nginx"; then
+#       echo "Nginx está instalado"
+#   fi
 is_package_installed() {
     local package="$1"
 
@@ -94,6 +129,10 @@ is_package_installed() {
 }
 
 # Instalar paquetes
+# Uso: install_packages <paquete1> [paquete2] [...]
+# Ejemplo:
+#   install_packages nginx php-fpm mysql-server
+#   install_packages $(cat lista_paquetes.txt)
 install_packages() {
     local packages=("$@")
     local packages_to_install=()
@@ -139,6 +178,10 @@ install_packages() {
 }
 
 # Remover paquetes
+# Uso: remove_packages <paquete1> [paquete2] [...]
+# Ejemplo:
+#   remove_packages apache2 mysql-server
+#   remove_packages $(cat paquetes_obsoletos.txt)
 remove_packages() {
     local packages=("$@")
     local packages_to_remove=()
@@ -175,6 +218,10 @@ remove_packages() {
 }
 
 # Agregar un repositorio PPA
+# Uso: add_ppa <nombre_ppa>
+# Ejemplo:
+#   add_ppa "ondrej/php"
+#   add_ppa "ppa:nginx/stable"
 add_ppa() {
     local ppa="$1"
     local keyring_path="/etc/apt/trusted.gpg.d"
@@ -198,6 +245,10 @@ add_ppa() {
 }
 
 # Agregar una llave GPG
+# Uso: add_apt_key <url_llave> [ruta_destino]
+# Ejemplo:
+#   add_apt_key "https://packages.example.com/key.gpg"
+#   add_apt_key "https://nginx.org/keys/nginx_signing.key" "/usr/share/keyrings/nginx-archive-keyring.gpg"
 add_apt_key() {
     local key_url="$1"
     local key_path="${2:-}"
@@ -221,6 +272,9 @@ add_apt_key() {
 }
 
 # Agregar un repositorio externo
+# Uso: add_apt_repository <repositorio> <nombre_archivo>
+# Ejemplo:
+#   add_apt_repository "deb https://nginx.org/packages/debian/ bullseye nginx" "nginx.list"
 add_apt_repository() {
     local repo="$1"
     local repo_file="$2"
@@ -236,6 +290,9 @@ add_apt_repository() {
 }
 
 # Mantener un paquete en su versión actual
+# Uso: hold_package <nombre_paquete>
+# Ejemplo:
+#   hold_package "nginx"  # Evita actualizaciones de nginx
 hold_package() {
     local package="$1"
 
@@ -254,6 +311,9 @@ hold_package() {
 }
 
 # Liberar un paquete mantenido
+# Uso: unhold_package <nombre_paquete>
+# Ejemplo:
+#   unhold_package "nginx"  # Permite actualizaciones de nginx
 unhold_package() {
     local package="$1"
 
@@ -266,5 +326,51 @@ unhold_package() {
     return 0
 }
 
+# Ejemplo de uso completo del script
+: '
+#!/bin/bash
+source ./packages.sh
+
+# Actualizar sistema
+apt_update
+apt_upgrade
+
+# Instalar stack LEMP
+PACKAGES=(
+    "nginx"
+    "php8.1-fpm"
+    "php8.1-mysql"
+    "mysql-server"
+)
+
+# Agregar repositorio PHP
+add_ppa "ondrej/php"
+apt_update
+
+# Instalar paquetes
+install_packages "${PACKAGES[@]}"
+
+# Mantener versión de nginx
+hold_package "nginx"
+
+# Limpiar sistema
+apt_clean
+'
+
+# Exportar funciones
+#export -f cleanup_dpkg_locks
+#export -f apt_update
+#export -f apt_upgrade
+#export -f apt_clean
+#export -f is_package_installed
+#export -f install_packages
+#export -f remove_packages
+#export -f add_ppa
+#export -f add_apt_key
+#export -f add_apt_repository
+#export -f hold_package
+#export -f unhold_package
+
 # Inicialización del módulo
-apt_update >/dev/null || true
+# Actualizar la lista de paquetes silenciosamente al cargar el script
+#apt_update >/dev/null || true

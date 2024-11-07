@@ -1,5 +1,19 @@
 #!/usr/bin/env bash
 # Gestión del entorno de provisión
+#
+# Este script proporciona funciones para gestionar el entorno de provisión,
+# incluyendo inicialización, limpieza, backups y restauración.
+#
+# Ejemplo de uso general:
+#   source ./environment.sh
+#
+#   # Inicializar y configurar limpieza
+#   init_provision_env
+#   trap cleanup_provision_env EXIT
+#
+#   # Crear backup y realizar cambios
+#   backup_environment
+#   save_provision_state "in_progress"
 
 # Importar dependencias necesarias
 if [ -z "$CRESET" ]; then
@@ -10,20 +24,32 @@ if [ ! "$(type -t log_info)" ]; then
 fi
 
 # Variables de entorno
+# Archivo de log actual para la provisión
 CURRENT_LOG_FILE=""
+
+# Timestamp único para esta ejecución
 PROVISION_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+
+# Directorio temporal para esta provisión
 TEMP_DIR="/tmp/provision_${PROVISION_TIMESTAMP}"
 
 # Definir directorios requeridos
+# Lista de directorios que deben existir para la provisión
 REQUIRED_DIRS=(
-    "${LOGS_DIR}"
-    "${PROJECT_DIR}/tmp"
-    "${PROJECT_DIR}/backups"
-    "${PROVISION_DIR}/tmp"
-    "$TEMP_DIR"
+    "${LOGS_DIR}"              # Directorio de logs
+    "${PROJECT_DIR}/tmp"       # Temporales del proyecto
+    "${PROJECT_DIR}/backups"   # Backups del proyecto
+    "${PROVISION_DIR}/tmp"     # Temporales de provisión
+    "$TEMP_DIR"               # Directorio temporal actual
 )
 
 # Función para inicializar el entorno de provisión
+# Uso: init_provision_env
+# Ejemplo:
+#   init_provision_env
+#   if [ $? -eq 0 ]; then
+#       echo "Entorno inicializado correctamente"
+#   fi
 init_provision_env() {
     log_header "Inicializando entorno de provisión"
 
@@ -47,6 +73,9 @@ init_provision_env() {
 }
 
 # Función para crear directorios necesarios
+# Uso: create_required_directories
+# Ejemplo:
+#   create_required_directories || exit 1
 create_required_directories() {
     log_info "Creando directorios necesarios..."
 
@@ -66,6 +95,10 @@ create_required_directories() {
 }
 
 # Función para limpiar archivos temporales
+# Uso: clean_temp_files
+# Ejemplo:
+#   clean_temp_files
+#   echo "Limpieza completada con código: $?"
 clean_temp_files() {
     log_info "Limpiando archivos temporales..."
 
@@ -89,6 +122,9 @@ clean_temp_files() {
 }
 
 # Función para obtener el timestamp de la última provisión
+# Uso: last_time=$(get_last_provision_time)
+# Ejemplo:
+#   echo "Última provisión: $(get_last_provision_time)"
 get_last_provision_time() {
     local last_provision_file="${PROVISION_DIR}/tmp/last_provision"
     if [ -f "$last_provision_file" ]; then
@@ -99,6 +135,10 @@ get_last_provision_time() {
 }
 
 # Función para guardar el estado de la provisión
+# Uso: save_provision_state <estado>
+# Ejemplo:
+#   save_provision_state "in_progress"
+#   save_provision_state "completed"
 save_provision_state() {
     local state="$1"
     local state_file="${PROVISION_DIR}/tmp/provision_state"
@@ -108,6 +148,11 @@ save_provision_state() {
 }
 
 # Función para obtener el estado de la provisión
+# Uso: state=$(get_provision_state)
+# Ejemplo:
+#   if [ "$(get_provision_state)" = "completed" ]; then
+#       echo "Provisión completada"
+#   fi
 get_provision_state() {
     local state_file="${PROVISION_DIR}/tmp/provision_state"
     if [ -f "$state_file" ]; then
@@ -118,6 +163,9 @@ get_provision_state() {
 }
 
 # Función para limpiar el entorno
+# Uso: cleanup_provision_env
+# Ejemplo:
+#   trap cleanup_provision_env EXIT
 cleanup_provision_env() {
     local exit_code=$?
     log_header "Limpiando entorno"
@@ -143,6 +191,10 @@ cleanup_provision_env() {
 }
 
 # Función para crear un backup del entorno
+# Uso: backup_environment
+# Ejemplo:
+#   backup_environment
+#   echo "Backup creado en: $PROVISION_TIMESTAMP"
 backup_environment() {
     local backup_dir="${PROJECT_DIR}/backups/env_${PROVISION_TIMESTAMP}"
     local dirs_to_backup=(
@@ -166,6 +218,12 @@ backup_environment() {
 }
 
 # Función para restaurar un backup
+# Uso: restore_environment <timestamp>
+# Ejemplo:
+#   restore_environment "20240107_123045"
+#   if [ $? -eq 0 ]; then
+#       echo "Restauración exitosa"
+#   fi
 restore_environment() {
     local backup_timestamp="$1"
     local backup_dir="${PROJECT_DIR}/backups/env_${backup_timestamp}"
@@ -197,6 +255,33 @@ restore_environment() {
 
     log_success "Entorno restaurado desde backup: $backup_timestamp"
 }
+
+# Ejemplo completo de uso del script
+: '
+#!/bin/bash
+source ./environment.sh
+
+# Inicializar entorno
+init_provision_env
+
+# Registrar limpieza al salir
+trap cleanup_provision_env EXIT
+
+# Crear backup inicial
+backup_environment
+
+# Comenzar provisión
+save_provision_state "in_progress"
+
+# Si algo falla, restaurar desde backup
+if ! perform_changes; then
+    restore_environment "$PROVISION_TIMESTAMP"
+    exit 1
+fi
+
+# Limpiar archivos temporales
+clean_temp_files
+'
 
 # Exportar funciones y variables
 #export CURRENT_LOG_FILE

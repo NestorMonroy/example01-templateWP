@@ -1,5 +1,18 @@
 #!/usr/bin/env bash
 # Funciones para manejo del sistema de archivos
+#
+# Este módulo proporciona funciones para la gestión segura del sistema de archivos,
+# incluyendo creación, modificación, copia y eliminación de archivos y directorios.
+#
+# Ejemplo de uso general:
+#   source ./filesystem.sh
+#
+#   # Crear estructura de directorios
+#   ensure_directory "/var/www/app" 755 "www-data" "www-data"
+#
+#   # Gestionar archivos de forma segura
+#   safe_copy "config.orig" "config.php" true
+#   set_permissions "/var/www" 644 755 "www-data" "www-data"
 
 # Importar módulos necesarios
 if [ -z "$CRESET" ]; then
@@ -10,36 +23,61 @@ if [ ! "$(type -t log_info)" ]; then
 fi
 
 # Variables para permisos por defecto
-DEFAULT_FILE_MODE=644
-DEFAULT_DIR_MODE=755
-DEFAULT_OWNER="vagrant"
-DEFAULT_GROUP="vagrant"
+# Estas variables definen los permisos y propietarios predeterminados
+DEFAULT_FILE_MODE=644           # Permisos predeterminados para archivos
+DEFAULT_DIR_MODE=755           # Permisos predeterminados para directorios
+DEFAULT_OWNER="vagrant"        # Usuario propietario predeterminado
+DEFAULT_GROUP="vagrant"        # Grupo propietario predeterminado
 
-# Verificar si un path existe
+# Funciones de verificación básicas
+# Uso: path_exists <ruta>
+# Ejemplo:
+#   if path_exists "/etc/hosts"; then
+#       echo "El archivo existe"
+#   fi
 path_exists() {
     local path="$1"
     [ -e "$path" ]
 }
 
 # Verificar si es un directorio
+# Uso: is_directory <ruta>
+# Ejemplo:
+#   if is_directory "/var/www"; then
+#       echo "Es un directorio"
+#   fi
 is_directory() {
     local path="$1"
     [ -d "$path" ]
 }
 
 # Verificar si es un archivo
+# Uso: is_file <ruta>
+# Ejemplo:
+#   if is_file "config.php"; then
+#       echo "Es un archivo"
+#   fi
 is_file() {
     local path="$1"
     [ -f "$path" ]
 }
 
 # Verificar si es un enlace simbólico
+# Uso: is_symlink <ruta>
+# Ejemplo:
+#   if is_symlink "/var/www/html"; then
+#       echo "Es un enlace simbólico"
+#   fi
 is_symlink() {
     local path="$1"
     [ -L "$path" ]
 }
 
 # Crear un directorio si no existe
+# Uso: ensure_directory <directorio> [modo] [propietario] [grupo]
+# Ejemplo:
+#   ensure_directory "/var/www/app" 755 "www-data" "www-data"
+#   ensure_directory "/var/log/app"  # Usa valores predeterminados
 ensure_directory() {
     local dir="$1"
     local mode="${2:-$DEFAULT_DIR_MODE}"
@@ -63,6 +101,10 @@ ensure_directory() {
 }
 
 # Crear un archivo si no existe
+# Uso: ensure_file <archivo> [contenido] [modo] [propietario] [grupo]
+# Ejemplo:
+#   ensure_file "/etc/app.conf" "config=valor" 644 "root" "root"
+#   ensure_file "info.txt" "Hola mundo"  # Usa valores predeterminados
 ensure_file() {
     local file="$1"
     local content="${2:-}"
@@ -98,6 +140,10 @@ ensure_file() {
 }
 
 # Crear un enlace simbólico
+# Uso: create_symlink <destino> <enlace> [forzar]
+# Ejemplo:
+#   create_symlink "/var/www/app" "/var/www/html" true
+#   create_symlink "/etc/nginx/sites-available/default" "/etc/nginx/sites-enabled/default"
 create_symlink() {
     local target="$1"
     local link="$2"
@@ -123,8 +169,11 @@ create_symlink() {
     log_success "Enlace simbólico creado: $link -> $target"
     return 0
 }
-
-# Copiar archivos o directorios
+# Copiar archivos o directorios de forma segura
+# Uso: safe_copy <origen> <destino> [backup]
+# Ejemplo:
+#   safe_copy "config.php" "/etc/app/config.php" true
+#   safe_copy "/var/www/app" "/var/www/backup"
 safe_copy() {
     local source="$1"
     local dest="$2"
@@ -153,7 +202,11 @@ safe_copy() {
     return 0
 }
 
-# Mover archivos o directorios
+# Mover archivos o directorios de forma segura
+# Uso: safe_move <origen> <destino> [backup]
+# Ejemplo:
+#   safe_move "app.new" "app" true
+#   safe_move "temp.txt" "final.txt"
 safe_move() {
     local source="$1"
     local dest="$2"
@@ -183,6 +236,10 @@ safe_move() {
 }
 
 # Eliminar archivos o directorios de forma segura
+# Uso: safe_remove <ruta> [backup]
+# Ejemplo:
+#   safe_remove "/var/www/old_app" true
+#   safe_remove "temp.txt" false  # Eliminar sin backup
 safe_remove() {
     local path="$1"
     local backup="${2:-true}"
@@ -211,6 +268,10 @@ safe_remove() {
 }
 
 # Establecer permisos recursivamente
+# Uso: set_permissions <ruta> [modo_archivo] [modo_dir] [propietario] [grupo]
+# Ejemplo:
+#   set_permissions "/var/www/app" 644 755 "www-data" "www-data"
+#   set_permissions "config.php" 600  # Solo modo archivo
 set_permissions() {
     local path="$1"
     local file_mode="${2:-$DEFAULT_FILE_MODE}"
@@ -241,6 +302,10 @@ set_permissions() {
 }
 
 # Buscar y reemplazar en archivos
+# Uso: search_replace <archivo> <buscar> <reemplazar> [backup]
+# Ejemplo:
+#   search_replace "config.php" "desarrollo" "produccion" true
+#   search_replace ".env" "DEBUG=true" "DEBUG=false"
 search_replace() {
     local file="$1"
     local search="$2"
@@ -270,6 +335,10 @@ search_replace() {
 }
 
 # Verificar espacio en disco
+# Uso: check_disk_space <espacio_minimo_mb> [ruta]
+# Ejemplo:
+#   check_disk_space 1000 "/var/www"
+#   check_disk_space 500  # Verifica root (/)
 check_disk_space() {
     local min_space="$1" # en MB
     local path="${2:-/}"
@@ -287,6 +356,10 @@ check_disk_space() {
 }
 
 # Crear archivo temporal
+# Uso: temp_file=$(create_temp_file [prefijo] [sufijo])
+# Ejemplo:
+#   temp_file=$(create_temp_file "backup" ".sql")
+#   echo "datos" > "$temp_file"
 create_temp_file() {
     local prefix="${1:-tmp}"
     local suffix="${2:-}"
@@ -304,6 +377,10 @@ create_temp_file() {
 }
 
 # Crear directorio temporal
+# Uso: temp_dir=$(create_temp_dir [prefijo])
+# Ejemplo:
+#   temp_dir=$(create_temp_dir "build")
+#   cp -r ./src/* "$temp_dir/"
 create_temp_dir() {
     local prefix="${1:-tmp}"
 
@@ -318,3 +395,50 @@ create_temp_dir() {
     echo "$temp_dir"
     return 0
 }
+
+# Ejemplo completo de uso del script
+: '
+#!/bin/bash
+source ./filesystem.sh
+
+# Crear estructura de directorios para una aplicación web
+ensure_directory "/var/www/app" 755 "www-data" "www-data"
+ensure_directory "/var/www/app/logs" 775 "www-data" "www-data"
+ensure_directory "/var/www/app/cache" 775 "www-data" "www-data"
+
+# Crear y configurar archivos
+ensure_file "/var/www/app/.env" "APP_ENV=production" 640 "www-data" "www-data"
+ensure_file "/var/www/app/config.php" "<?php return [];" 644 "www-data" "www-data"
+
+# Crear enlaces simbólicos
+create_symlink "/var/www/app" "/var/www/html" true
+
+# Copiar archivos con backup
+safe_copy "/etc/nginx/nginx.conf.orig" "/etc/nginx/nginx.conf"
+
+# Establecer permisos recursivamente
+set_permissions "/var/www/app" 644 755 "
+'
+
+# Exportar funciones
+#export -f path_exists
+#export -f is_directory
+#export -f is_file
+#export -f is_symlink
+#export -f ensure_directory
+#export -f ensure_file
+#export -f create_symlink
+#export -f safe_copy
+#export -f safe_move
+#export -f safe_remove
+#export -f set_permissions
+#export -f search_replace
+#export -f check_disk_space
+#export -f create_temp_file
+#export -f create_temp_dir
+
+# Variables exportadas
+#export DEFAULT_FILE_MODE
+#export DEFAULT_DIR_MODE
+#export DEFAULT_OWNER
+#export DEFAULT_GROUP

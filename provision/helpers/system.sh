@@ -1,5 +1,20 @@
 #!/usr/bin/env bash
 # Funciones básicas relacionadas con el sistema operativo
+#
+# Este script proporciona funciones para verificar y obtener información
+# del sistema operativo, recursos del sistema y requisitos mínimos.
+#
+# Ejemplo de uso general:
+#   source ./system.sh
+#
+#   # Verificar requisitos mínimos
+#   check_system_requirements 1024 2
+#
+#   # Mostrar información del sistema
+#   show_system_info
+#
+#   # Verificar ambiente
+#   check_environment_requirements 10 2048 2
 
 # Importar módulos necesarios
 if [ -z "$CRESET" ]; then
@@ -10,20 +25,27 @@ if [ ! "$(type -t log_info)" ]; then
 fi
 
 # Variables del sistema
-export DEBIAN_FRONTEND=noninteractive
-export SYSTEM_MEMORY=$(free -m | awk '/^Mem:/{print $2}')
-export CPU_CORES=$(nproc)
-export OS_NAME=$(lsb_release -si)
-export OS_VERSION=$(lsb_release -sr)
-export OS_CODENAME=$(lsb_release -sc)
-export DISK_SPACE=$(df -h / | awk 'NR==2 {print $4}')
+# Estas variables se calculan una vez al cargar el script
+export DEBIAN_FRONTEND=noninteractive                          # Evita prompts interactivos
+export SYSTEM_MEMORY=$(free -m | awk '/^Mem:/{print $2}')     # Memoria total en MB
+export CPU_CORES=$(nproc)                                     # Número de cores CPU
+export OS_NAME=$(lsb_release -si)                            # Nombre del SO
+export OS_VERSION=$(lsb_release -sr)                         # Versión del SO
+export OS_CODENAME=$(lsb_release -sc)                        # Nombre código del SO
+export DISK_SPACE=$(df -h / | awk 'NR==2 {print $4}')       # Espacio libre en disco
 
-# Función para ejecutar como no root
+# Función para ejecutar comandos como usuario no root
+# Uso: noroot <comando>
+# Ejemplo:
+#   noroot composer install
 noroot() {
     sudo -EH -u "vagrant" "$@"
 }
 
 # Verificar si se está ejecutando como root
+# Uso: check_root
+# Ejemplo:
+#   check_root || exit 1
 check_root() {
     if [[ $EUID -ne 0 ]]; then
         log_error "Este script debe ejecutarse como root"
@@ -32,6 +54,9 @@ check_root() {
 }
 
 # Verificar requisitos mínimos del sistema
+# Uso: check_system_requirements [min_memory_mb] [min_cores]
+# Ejemplo:
+#   check_system_requirements 1024 2
 check_system_requirements() {
     local min_memory="${1:-512}" # MB
     local min_cores="${2:-1}"
@@ -53,6 +78,9 @@ check_system_requirements() {
 }
 
 # Obtener información del sistema operativo
+# Uso: os_info=$(get_os_info)
+# Ejemplo:
+#   echo "Sistema operativo: $(get_os_info)"
 get_os_info() {
     if [ -f /etc/os-release ]; then
         source /etc/os-release
@@ -62,22 +90,26 @@ get_os_info() {
     fi
 }
 
-# Obtener memoria total
+# Funciones para obtener recursos del sistema
+# Uso: memoria=$(get_total_memory)
+#      espacio=$(get_disk_space)
+#      cores=$(get_cpu_cores)
 get_total_memory() {
     echo "$SYSTEM_MEMORY"
 }
 
-# Obtener espacio en disco
 get_disk_space() {
     echo "$DISK_SPACE"
 }
 
-# Obtener número de cores CPU
 get_cpu_cores() {
     echo "$CPU_CORES"
 }
 
 # Mostrar información completa del sistema
+# Uso: show_system_info
+# Ejemplo:
+#   show_system_info > system_info.log
 show_system_info() {
     log_header "Información del Sistema"
 
@@ -93,6 +125,9 @@ show_system_info() {
 }
 
 # Verificar requisitos del ambiente
+# Uso: check_environment_requirements [min_disk_gb] [min_memory_mb] [min_cores]
+# Ejemplo:
+#   check_environment_requirements 10 2048 2
 check_environment_requirements() {
     local min_disk="${1:-5}" # GB
     local min_memory="${2:-1024}" # MB
@@ -130,6 +165,9 @@ check_environment_requirements() {
 }
 
 # Verificar versión del sistema operativo
+# Uso: check_os_version <os_requerido> <version_requerida>
+# Ejemplo:
+#   check_os_version "Ubuntu" "20.04"
 check_os_version() {
     local required_os="$1"
     local required_version="$2"
@@ -148,19 +186,21 @@ check_os_version() {
     return 0
 }
 
-# Obtener uso de CPU
+# Obtener métricas del sistema
+# Uso:
+#   cpu=$(get_cpu_usage)
+#   memoria=$(get_memory_usage)
+#   temp=$(get_system_temperature)
 get_cpu_usage() {
     local cpu_usage=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}')
     echo "$cpu_usage"
 }
 
-# Obtener uso de memoria
 get_memory_usage() {
     local memory_usage=$(free | grep Mem | awk '{print $3/$2 * 100.0}')
     printf "%.2f" "$memory_usage"
 }
 
-# Obtener temperatura del sistema (si está disponible)
 get_system_temperature() {
     if [ -x "$(command -v sensors)" ]; then
         sensors | grep "CPU Temperature" | awk '{print $3}'
@@ -168,6 +208,30 @@ get_system_temperature() {
         echo "N/A"
     fi
 }
+
+# Ejemplo de uso completo del script
+: '
+# Verificar permisos y requisitos básicos
+check_root
+check_system_requirements 2048 2
+
+# Mostrar información del sistema
+show_system_info
+
+# Verificar ambiente específico
+check_environment_requirements 20 4096 4
+
+# Verificar versión específica de SO
+check_os_version "Ubuntu" "20.04"
+
+# Monitorear recursos
+while true; do
+    echo "CPU Usage: $(get_cpu_usage)%"
+    echo "Memory Usage: $(get_memory_usage)%"
+    echo "Temperature: $(get_system_temperature)"
+    sleep 5
+done
+'
 
 # Verificar que estamos como root al cargar el módulo
 check_root

@@ -1,27 +1,46 @@
 #!/usr/bin/env bash
 # Funciones de logging y formato de salida
+#
+# Este módulo proporciona un sistema completo de logging con soporte para:
+# - Múltiples niveles de log (DEBUG, INFO, NOTICE, WARNING, ERROR, CRITICAL)
+# - Salida coloreada en terminal
+# - Salida a archivo
+# - Formateo con tags
+# - Timestamps
+#
+# Ejemplo de uso básico:
+#   source ./logging.sh
+#
+#   set_log_file "/var/log/provision.log"
+#   set_log_level "DEBUG"
+#
+#   log_info "Iniciando proceso"
+#   log_debug "Variables: $VARS"
+#   log_error "Algo falló"
 
 # Asegurarse de que los colores estén disponibles
 if [ -z "$CRESET" ]; then
     source "$(dirname "${BASH_SOURCE[0]}")/colors.sh"
 fi
 
-# Timestamp para logs
+# Función para obtener timestamp actual
+# Uso: timestamp=$(get_timestamp)
 get_timestamp() {
     date "+%Y-%m-%d %H:%M:%S"
 }
 
-# Niveles de log
+# Niveles de log disponibles y sus valores numéricos
+# Menor número = más detallado
 declare -A LOG_LEVELS=(
-    ["DEBUG"]=0
-    ["INFO"]=1
-    ["NOTICE"]=2
-    ["WARNING"]=3
-    ["ERROR"]=4
-    ["CRITICAL"]=5
+    ["DEBUG"]=0      # Información detallada para debugging
+    ["INFO"]=1       # Información general (default)
+    ["NOTICE"]=2     # Notificaciones importantes
+    ["WARNING"]=3    # Advertencias
+    ["ERROR"]=4      # Errores
+    ["CRITICAL"]=5   # Errores críticos
 )
 
-# Colores por nivel de log
+# Colores asociados a cada nivel de log
 declare -A LOG_COLORS=(
     ["DEBUG"]="${DEBUG_COLOR}"
     ["INFO"]="${INFO_COLOR}"
@@ -31,13 +50,27 @@ declare -A LOG_COLORS=(
     ["CRITICAL"]="${ERROR_COLOR}${BOLD}"
 )
 
-# Nivel de log actual (puede modificarse en tiempo de ejecución)
+# Nivel de log actual
 CURRENT_LOG_LEVEL=${CURRENT_LOG_LEVEL:-1} # Default a INFO
 
 # Archivo de log actual
 CURRENT_LOG_FILE=""
 
 # Función para formatear la salida con tags
+# Uso: format_output "<b>texto</b> <error>error</error>"
+# Tags disponibles:
+#   <b> - Negrita
+#   <i> - Itálica
+#   <u> - Subrayado
+#   <dim> - Atenuado
+#   <info> - Color info
+#   <success> - Color éxito
+#   <warn> - Color advertencia
+#   <error> - Color error
+#   <notice> - Color noticia
+#   <debug> - Color debug
+#   <url> - Color URL
+#   </> - Reset
 format_output() {
     declare -A TAGS=(
         ['<b>']="${BOLD}"
@@ -74,6 +107,8 @@ format_output() {
 }
 
 # Función base para logging
+# Uso interno: log_base <nivel> <mensaje>
+# Ejemplo: log_base "INFO" "Mensaje"
 log_base() {
     local level="$1"
     local message="$2"
@@ -127,6 +162,7 @@ log_base() {
 }
 
 # Funciones específicas para cada nivel de log
+# Uso: log_xxx "mensaje"
 log_debug() {
     log_base "DEBUG" "$1"
 }
@@ -152,6 +188,8 @@ log_critical() {
 }
 
 # Función para configurar archivo de log
+# Uso: set_log_file <ruta_archivo>
+# Ejemplo: set_log_file "/var/log/provision.log"
 set_log_file() {
     local log_file="$1"
     local log_dir
@@ -173,6 +211,8 @@ set_log_file() {
 }
 
 # Función para configurar nivel de log
+# Uso: set_log_level <nivel>
+# Ejemplo: set_log_level "DEBUG"
 set_log_level() {
     local level="$1"
     if [[ -n "${LOG_LEVELS[$level]}" ]]; then
@@ -185,6 +225,8 @@ set_log_level() {
 }
 
 # Función para imprimir una línea separadora
+# Uso: log_separator [caracter] [longitud]
+# Ejemplo: log_separator "-" 80
 log_separator() {
     local char="${1:-"-"}"
     local length="${2:-80}"
@@ -192,6 +234,8 @@ log_separator() {
 }
 
 # Función para imprimir un encabezado
+# Uso: log_header <título> [caracter] [longitud]
+# Ejemplo: log_header "Inicio de Proceso" "=" 80
 log_header() {
     local title="$1"
     local char="${2:-"="}"
@@ -205,6 +249,8 @@ log_header() {
 }
 
 # Función para ejecutar y loguear comandos
+# Uso: log_command <comando> [descripción]
+# Ejemplo: log_command "apt-get update" "Actualizando repositorios"
 log_command() {
     local cmd="$1"
     local description="${2:-$cmd}"
@@ -230,6 +276,36 @@ log_command() {
         return 0
     fi
 }
+
+# Ejemplo completo de uso del script
+: '
+#!/bin/bash
+source ./logging.sh
+
+# Configurar logging
+set_log_file "/var/log/provision.log"
+set_log_level "DEBUG"
+
+# Usar encabezados
+log_header "Inicio de Instalación"
+
+# Logging básico
+log_info "Iniciando proceso..."
+log_debug "Variables cargadas"
+
+# Ejecutar comandos
+if ! log_command "apt-get update" "Actualizando sistema"; then
+    log_error "Fallo en actualización"
+    exit 1
+fi
+
+# Usar formato
+log_info $(format_output "<b>Instalación completada</b>")
+
+# Separadores
+log_separator
+log_info "Proceso finalizado"
+'
 
 # Inicializar logging si no está inicializado
 if [ -z "$LOG_INITIALIZED" ]; then

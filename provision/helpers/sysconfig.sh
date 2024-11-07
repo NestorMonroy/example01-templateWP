@@ -1,5 +1,20 @@
 #!/usr/bin/env bash
 # Configuraciones del sistema operativo
+#
+# Este script proporciona funciones para configurar varios aspectos del sistema
+# operativo, incluyendo límites del sistema, swap, zona horaria, localización
+# y parámetros del kernel.
+#
+# Ejemplo de uso general:
+#   source ./sysconfig.sh
+#
+#   # Configurar límites y swap
+#   set_system_limits 65535 65535
+#   set_swap 2048
+#
+#   # Configurar zona horaria y locale
+#   set_timezone "America/Mexico_City"
+#   set_locale "es_MX.UTF-8"
 
 # Importar módulos necesarios
 if [ -z "$CRESET" ]; then
@@ -16,6 +31,10 @@ fi
 check_root
 
 # Gestión de límites del sistema
+# Uso: set_system_limits [nofile_soft] [nofile_hard]
+# Ejemplo:
+#   set_system_limits 65535 65535
+#   set_system_limits 32768  # Solo límite soft
 set_system_limits() {
     local limit_file="/etc/security/limits.conf"
     local nofile_soft="${1:-65535}"
@@ -74,6 +93,8 @@ EOF
 }
 
 # Función para verificar límites actuales
+# Uso: check_system_limits
+# Ejemplo: check_system_limits
 check_system_limits() {
     local soft_limit
     local hard_limit
@@ -89,6 +110,8 @@ check_system_limits() {
 }
 
 # Función para restaurar límites originales
+# Uso: restore_system_limits
+# Ejemplo: restore_system_limits
 restore_system_limits() {
     local limit_file="/etc/security/limits.conf"
     local orig_file="${limit_file}.orig"
@@ -110,6 +133,10 @@ restore_system_limits() {
 }
 
 # Configuración de Swap
+# Uso: set_swap [tamaño_mb]
+# Ejemplo:
+#   set_swap 2048  # Crear swap de 2GB
+#   set_swap       # Usar tamaño predeterminado (1GB)
 set_swap() {
     local size="${1:-1024}" # MB
     local swapfile="/swapfile"
@@ -137,6 +164,10 @@ set_swap() {
 }
 
 # Configuración de zona horaria
+# Uso: set_timezone [zona_horaria]
+# Ejemplo:
+#   set_timezone "America/Mexico_City"
+#   set_timezone "UTC"
 set_timezone() {
     local timezone="${1:-UTC}"
 
@@ -155,6 +186,10 @@ set_timezone() {
 }
 
 # Configuración de locales
+# Uso: set_locale [locale]
+# Ejemplo:
+#   set_locale "es_MX.UTF-8"
+#   set_locale "en_US.UTF-8"
 set_locale() {
     local locale="${1:-en_US.UTF-8}"
 
@@ -177,6 +212,10 @@ set_locale() {
 }
 
 # Configuración de kernel
+# Uso: set_kernel_parameter <parametro> <valor>
+# Ejemplo:
+#   set_kernel_parameter "vm.swappiness" "10"
+#   set_kernel_parameter "fs.file-max" "65535"
 set_kernel_parameter() {
     local param="$1"
     local value="$2"
@@ -205,6 +244,32 @@ set_kernel_parameter() {
     log_success "Parámetro del kernel configurado correctamente"
     return 0
 }
+
+# Ejemplo de uso completo del script
+: '
+#!/bin/bash
+source ./sysconfig.sh
+
+# 1. Configurar límites del sistema
+set_system_limits 65535 65535
+check_system_limits
+
+# 2. Configurar swap si es necesario
+if [ "$(free -m | awk "/^Swap:/{print \$2}")" -eq 0 ]; then
+    set_swap 4096  # 4GB de swap
+fi
+
+# 3. Configurar zona horaria para México
+set_timezone "America/Mexico_City"
+
+# 4. Configurar locale para español México
+set_locale "es_MX.UTF-8"
+
+# 5. Optimizar parámetros del kernel
+set_kernel_parameter "vm.swappiness" "10"
+set_kernel_parameter "fs.file-max" "65535"
+set_kernel_parameter "net.core.somaxconn" "65535"
+'
 
 # Exportar funciones
 #export -f set_system_limits

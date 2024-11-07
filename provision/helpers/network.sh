@@ -1,5 +1,20 @@
 #!/usr/bin/env bash
 # Funciones para gestión y verificación de red
+#
+# Este script proporciona funciones para verificar conectividad de red,
+# descargar archivos, verificar servicios y gestionar configuraciones de red.
+#
+# Ejemplo de uso general:
+#   source ./network.sh
+#
+#   # Verificar conexión a internet
+#   check_internet_connection
+#
+#   # Descargar WordPress
+#   download_file "https://wordpress.org/latest.zip" "/tmp/wp.zip" "WordPress"
+#
+#   # Verificar servicios críticos
+#   check_required_services
 
 # Importar módulos necesarios
 if [ -z "$CRESET" ]; then
@@ -10,12 +25,16 @@ if [ ! "$(type -t log_info)" ]; then
 fi
 
 # Variables de red
-NETWORK_TIMEOUT=${NETWORK_TIMEOUT:-5}
-NETWORK_RETRIES=${NETWORK_RETRIES:-3}
+# Configura timeouts y reintentos para operaciones de red
+NETWORK_TIMEOUT=${NETWORK_TIMEOUT:-5}    # Timeout predeterminado en segundos
+NETWORK_RETRIES=${NETWORK_RETRIES:-3}    # Número de intentos de reintento
+
+# Opciones predeterminadas para herramientas de red
 CURL_OPTIONS="--silent --fail --location --connect-timeout ${NETWORK_TIMEOUT}"
 WGET_OPTIONS="--quiet --timeout=${NETWORK_TIMEOUT} --tries=${NETWORK_RETRIES}"
 
 # URLs importantes para verificar conectividad
+# Ejemplo: check_required_services verificará estas URLs
 declare -A IMPORTANT_URLS=(
     ["packagist"]="https://packagist.org"
     ["github"]="https://github.com"
@@ -24,6 +43,11 @@ declare -A IMPORTANT_URLS=(
 )
 
 # Función para verificar conexión a internet
+# Uso: check_internet_connection [timeout]
+# Ejemplo:
+#   if check_internet_connection 10; then
+#       echo "Tenemos conexión"
+#   fi
 check_internet_connection() {
     local timeout="${1:-5}"
     log_info "Verificando conexión a internet..."
@@ -45,6 +69,9 @@ check_internet_connection() {
 }
 
 # Verificar conexión a un host específico
+# Uso: check_host_connection <host> [puerto] [timeout]
+# Ejemplo:
+#   check_host_connection "wordpress.org" 443 5
 check_host_connection() {
     local host="$1"
     local port="${2:-80}"
@@ -62,6 +89,11 @@ check_host_connection() {
 }
 
 # Verificar que los servicios necesarios estén disponibles
+# Uso: check_required_services
+# Ejemplo:
+#   if check_required_services; then
+#       echo "Todos los servicios están disponibles"
+#   fi
 check_required_services() {
     log_info "Verificando servicios requeridos..."
     local failed_services=()
@@ -86,6 +118,9 @@ check_required_services() {
 }
 
 # Descargar archivo con progreso
+# Uso: download_file <url> <ruta_destino> [descripción]
+# Ejemplo:
+#   download_file "https://wordpress.org/latest.zip" "/tmp/wp.zip" "WordPress"
 download_file() {
     local url="$1"
     local output="$2"
@@ -113,6 +148,9 @@ download_file() {
 }
 
 # Verificar checksum de un archivo
+# Uso: verify_checksum <archivo> <checksum_esperado> [algoritmo]
+# Ejemplo:
+#   verify_checksum "wordpress.zip" "abc123..." "sha256"
 verify_checksum() {
     local file="$1"
     local expected_checksum="$2"
@@ -158,6 +196,11 @@ verify_checksum() {
 }
 
 # Obtener IP pública
+# Uso: ip=$(get_public_ip)
+# Ejemplo:
+#   if ip=$(get_public_ip); then
+#       echo "Mi IP pública es: $ip"
+#   fi
 get_public_ip() {
     local ip
 
@@ -180,6 +223,9 @@ get_public_ip() {
 }
 
 # Agregar entrada al archivo hosts
+# Uso: add_hosts_entry <ip> <hostname>
+# Ejemplo:
+#   add_hosts_entry "127.0.0.1" "local.wordpress.test"
 add_hosts_entry() {
     local ip="$1"
     local hostname="$2"
@@ -195,6 +241,11 @@ add_hosts_entry() {
 }
 
 # Verificar certificado SSL
+# Uso: check_ssl_certificate <dominio> [puerto]
+# Ejemplo:
+#   if check_ssl_certificate "wordpress.org" 443; then
+#       echo "Certificado SSL válido"
+#   fi
 check_ssl_certificate() {
     local domain="$1"
     local port="${2:-443}"
@@ -205,6 +256,24 @@ check_ssl_certificate() {
         return 1
     fi
 }
+
+# Ejemplo de uso completo del script
+: '
+# Verificar conexión básica
+check_internet_connection
+
+# Descargar WordPress y verificar su checksum
+download_file "https://wordpress.org/latest.zip" "/tmp/wordpress.zip" "WordPress"
+verify_checksum "/tmp/wordpress.zip" "abc123..." "sha256"
+
+# Configurar host local
+ip=$(get_public_ip)
+add_hosts_entry "$ip" "mi-wordpress.local"
+
+# Verificar servicios y SSL
+check_required_services
+check_ssl_certificate "wordpress.org"
+'
 
 # Exportar funciones
 #export -f check_internet_connection
