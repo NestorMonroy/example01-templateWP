@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
-# Cargar helpers y configuración
-source "$(dirname "${BASH_SOURCE[0]}")/helpers.sh"
+# Cargar configuración y helpers
 source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 
 # Función para verificar dependencias
@@ -58,6 +57,14 @@ run_provision_post_hooks() {
 
 # Función principal de provisión
 main_provision() {
+    # Inicializar entorno
+    init_provision_env
+
+    # Verificar si estamos ejecutando como root
+    if [[ $EUID -ne 0 ]]; then
+        error_exit "Este script debe ejecutarse como root"
+    fi
+
     # Mostrar información inicial
     log_header "Iniciando Provisión"
     log_info "Fecha: $(date)"
@@ -103,9 +110,11 @@ main_provision() {
     # Ejecutar post-hooks
     run_provision_post_hooks
 
-    log_success "Provisión completada exitosamente"
     return 0
 }
 
 # Ejecutar provisión
 main_provision
+
+# La limpieza se maneja automáticamente a través del trap en config.sh
+exit $?

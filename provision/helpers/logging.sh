@@ -257,11 +257,3 @@ fi
 #export -f log_separator
 #export -f log_header
 #export -f log_command
-
-
-
-
-
-└── helpers/
-    ├── hooks.sh   # Manejo de hooks
-    └── ...
