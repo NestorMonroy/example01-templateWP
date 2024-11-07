@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Funciones relacionadas con el sistema operativo y servicios
+# Funciones básicas relacionadas con el sistema operativo
 
 # Importar módulos necesarios
 if [ -z "$CRESET" ]; then
@@ -16,6 +16,7 @@ export CPU_CORES=$(nproc)
 export OS_NAME=$(lsb_release -si)
 export OS_VERSION=$(lsb_release -sr)
 export OS_CODENAME=$(lsb_release -sc)
+export DISK_SPACE=$(df -h / | awk 'NR==2 {print $4}')
 
 # Función para ejecutar como no root
 noroot() {
@@ -51,188 +52,137 @@ check_system_requirements() {
     return 0
 }
 
-# Gestión de servicios
-service_exists() {
-    local service_name="$1"
-    systemctl list-unit-files | grep -q "^$service_name\.service"
-}
-
-service_is_running() {
-    local service_name="$1"
-    systemctl is-active --quiet "$service_name"
-}
-
-service_is_enabled() {
-    local service_name="$1"
-    systemctl is-enabled --quiet "$service_name"
-}
-
-service_control() {
-    local action="$1"
-    local service="$2"
-    local description="${3:-$service}"
-
-    log_info "Service $action: $description"
-
-    if ! service_exists "$service"; then
-        log_error "Servicio $service no encontrado"
-        return 1
-    fi
-
-    case "$action" in
-        start)
-            systemctl start "$service"
-            ;;
-        stop)
-            systemctl stop "$service"
-            ;;
-        restart)
-            systemctl restart "$service"
-            ;;
-        reload)
-            systemctl reload "$service"
-            ;;
-        enable)
-            systemctl enable "$service"
-            ;;
-        disable)
-            systemctl disable "$service"
-            ;;
-        *)
-            log_error "Acción desconocida: $action"
-            return 1
-            ;;
-    esac
-
-    if [ $? -ne 0 ]; then
-        log_error "Error al $action servicio $description"
-        return 1
-    fi
-
-    log_success "$description $action completado"
-    return 0
-}
-
-# Gestión de procesos
-process_is_running() {
-    local process_name="$1"
-    pgrep -f "$process_name" >/dev/null
-}
-
-kill_process() {
-    local process_name="$1"
-    local signal="${2:-TERM}"
-
-    if process_is_running "$process_name"; then
-        log_info "Matando proceso: $process_name con señal $signal"
-        pkill "-$signal" -f "$process_name"
-        return $?
-    fi
-    return 0
-}
-
-# Gestión de puertos
-port_is_open() {
-    local port="$1"
-    local protocol="${2:-tcp}"
-    netstat -tuln | grep -q ":$port "
-}
-
-wait_for_port() {
-    local port="$1"
-    local timeout="${2:-30}"
-    local description="${3:-port $port}"
-
-    log_info "Esperando que $description esté disponible..."
-
-    local counter=0
-    while ! port_is_open "$port"; do
-        counter=$((counter + 1))
-        if [ "$counter" -ge "$timeout" ]; then
-            log_error "Timeout esperando por $description"
-            return 1
-        fi
-        sleep 1
-    done
-
-    log_success "$description está disponible"
-    return 0
-}
-
-# Información del sistema
-get_system_info() {
-    local info=""
-    info+="Sistema Operativo: $OS_NAME $OS_VERSION ($OS_CODENAME)\n"
-    info+="Memoria Total: $SYSTEM_MEMORY MB\n"
-    info+="CPU Cores: $CPU_CORES\n"
-    info+="Kernel: $(uname -r)\n"
-    info+="Hostname: $(hostname)\n"
-    info+="IP Address: $(hostname -I | cut -d' ' -f1)\n"
-    echo -e "$info"
-}
-
-# Gestión de tiempo de sistema
-set_timezone() {
-    local timezone="${1:-UTC}"
-    if [ -f "/usr/share/zoneinfo/$timezone" ]; then
-        log_info "Configurando zona horaria a $timezone"
-        ln -sf "/usr/share/zoneinfo/$timezone" /etc/localtime
-        dpkg-reconfigure -f noninteractive tzdata
-        log_success "Zona horaria configurada a $timezone"
-        return 0
+# Obtener información del sistema operativo
+get_os_info() {
+    if [ -f /etc/os-release ]; then
+        source /etc/os-release
+        echo "$NAME $VERSION"
     else
-        log_error "Zona horaria $timezone no válida"
+        uname -s
+    fi
+}
+
+# Obtener memoria total
+get_total_memory() {
+    echo "$SYSTEM_MEMORY"
+}
+
+# Obtener espacio en disco
+get_disk_space() {
+    echo "$DISK_SPACE"
+}
+
+# Obtener número de cores CPU
+get_cpu_cores() {
+    echo "$CPU_CORES"
+}
+
+# Mostrar información completa del sistema
+show_system_info() {
+    log_header "Información del Sistema"
+
+    log_info "Sistema Operativo: $(get_os_info)"
+    log_info "Versión: $OS_VERSION ($OS_CODENAME)"
+    log_info "Kernel: $(uname -r)"
+    log_info "Arquitectura: $(uname -m)"
+    log_info "Memoria Total: $(get_total_memory) MB"
+    log_info "CPU Cores: $(get_cpu_cores)"
+    log_info "Espacio en Disco: $(get_disk_space)"
+    log_info "Hostname: $(hostname)"
+    log_info "IP Principal: $(hostname -I | awk '{print $1}')"
+}
+
+# Verificar requisitos del ambiente
+check_environment_requirements() {
+    local min_disk="${1:-5}" # GB
+    local min_memory="${2:-1024}" # MB
+    local min_cores="${3:-1}"
+
+    log_info "Verificando requisitos del ambiente..."
+
+    # Verificar espacio en disco
+    local disk_gb=$(df -BG / | awk 'NR==2 {gsub("G",""); print $4}')
+    if [ "$disk_gb" -lt "$min_disk" ]; then
+        log_error "Espacio en disco insuficiente: ${disk_gb}GB (mínimo: ${min_disk}GB)"
         return 1
     fi
-}
 
-# Gestión de límites del sistema
-set_system_limits() {
-    local limit_file="/etc/security/limits.conf"
-    local nofile_soft="${1:-65535}"
-    local nofile_hard="${2:-65535}"
-
-    log_info "Configurando límites del sistema..."
-
-    # Hacer backup del archivo original
-    if [ ! -f "${limit_file}.orig" ]; then
-        cp "$limit_file" "${limit_file}.orig"
+    # Verificar memoria
+    if [ "$SYSTEM_MEMORY" -lt "$min_memory" ]; then
+        log_error "Memoria RAM insuficiente: ${SYSTEM_MEMORY}MB (mínimo: ${min_memory}MB)"
+        return 1
     fi
 
-    # Configurar límites
-    cat >> "$limit_file" << EOF
-* soft nofile $nofile_soft
-* hard nofile $nofile_hard
-EOF
+    # Verificar CPU cores
+    if [ "$CPU_CORES" -lt "$min_cores" ]; then
+        log_error "Núcleos CPU insuficientes: ${CPU_CORES} (mínimo: ${min_cores})"
+        return 1
+    fi
 
-    log_success "Límites del sistema configurados"
+    # Verificar conectividad
+    if ! ping -c 1 8.8.8.8 >/dev/null 2>&1; then
+        log_error "No hay conexión a internet"
+        return 1
+    fi
+
+    log_success "Todos los requisitos del ambiente cumplidos"
     return 0
 }
 
-# Gestión de memoria virtual
-set_swap() {
-    local size="${1:-1024}" # MB
-    local swapfile="/swapfile"
+# Verificar versión del sistema operativo
+check_os_version() {
+    local required_os="$1"
+    local required_version="$2"
 
-    if [ -f "$swapfile" ]; then
-        log_warning "Archivo swap ya existe"
-        return 0
+    if [ "$OS_NAME" != "$required_os" ]; then
+        log_error "Sistema operativo incorrecto: $OS_NAME (requerido: $required_os)"
+        return 1
     fi
 
-    log_info "Creando archivo swap de ${size}MB..."
+    if [ "$OS_VERSION" != "$required_version" ]; then
+        log_error "Versión incorrecta: $OS_VERSION (requerida: $required_version)"
+        return 1
+    fi
 
-    # Crear archivo swap
-    dd if=/dev/zero of="$swapfile" bs=1M count="$size"
-    chmod 600 "$swapfile"
-    mkswap "$swapfile"
-    swapon "$swapfile"
-
-    # Hacer permanente
-    echo "$swapfile none swap sw 0 0" >> /etc/fstab
-
-    log_success "Swap configurado correctamente"
+    log_success "Versión del sistema operativo correcta"
     return 0
+}
+
+# Obtener uso de CPU
+get_cpu_usage() {
+    local cpu_usage=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}')
+    echo "$cpu_usage"
+}
+
+# Obtener uso de memoria
+get_memory_usage() {
+    local memory_usage=$(free | grep Mem | awk '{print $3/$2 * 100.0}')
+    printf "%.2f" "$memory_usage"
+}
+
+# Obtener temperatura del sistema (si está disponible)
+get_system_temperature() {
+    if [ -x "$(command -v sensors)" ]; then
+        sensors | grep "CPU Temperature" | awk '{print $3}'
+    else
+        echo "N/A"
+    fi
 }
 
 # Verificar que estamos como root al cargar el módulo
 check_root
+
+# Exportar funciones
+export -f noroot
+export -f check_root
+export -f check_system_requirements
+export -f get_os_info
+export -f get_total_memory
+export -f get_disk_space
+export -f get_cpu_cores
+export -f show_system_info
+export -f check_environment_requirements
+export -f check_os_version
+export -f get_cpu_usage
+export -f get_memory_usage
+export -f get_system_temperature

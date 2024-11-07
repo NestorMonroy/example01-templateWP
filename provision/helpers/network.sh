@@ -38,7 +38,7 @@ check_internet_connection() {
     if ! ping -c 1 -W "$timeout" google.com >/dev/null 2>&1; then
         log_error "La resolución DNS falló (ping a google.com falló)"
         return 1
-    }
+    fi
 
     log_success "Conexión a internet verificada"
     return 0
@@ -194,42 +194,6 @@ add_hosts_entry() {
     log_success "Entrada agregada a hosts: $ip $hostname"
 }
 
-# Verificar si un puerto está en uso
-is_port_in_use() {
-    local port="$1"
-    local protocol="${2:-tcp}"
-
-    case "$protocol" in
-        tcp)
-            netstat -tln | grep -q ":${port} "
-            ;;
-        udp)
-            netstat -uln | grep -q ":${port} "
-            ;;
-        *)
-            log_error "Protocolo no soportado: $protocol"
-            return 1
-            ;;
-    esac
-}
-
-# Encontrar siguiente puerto disponible
-find_next_available_port() {
-    local start_port="$1"
-    local end_port="${2:-65535}"
-    local protocol="${3:-tcp}"
-
-    for port in $(seq "$start_port" "$end_port"); do
-        if ! is_port_in_use "$port" "$protocol"; then
-            echo "$port"
-            return 0
-        fi
-    done
-
-    log_error "No se encontraron puertos disponibles entre $start_port y $end_port"
-    return 1
-}
-
 # Verificar certificado SSL
 check_ssl_certificate() {
     local domain="$1"
@@ -242,8 +206,12 @@ check_ssl_certificate() {
     fi
 }
 
-# Inicialización del módulo
-check_internet_connection || {
-    log_error "Se requiere conexión a internet para continuar"
-    exit 1
-}
+# Exportar funciones
+export -f check_internet_connection
+export -f check_host_connection
+export -f check_required_services
+export -f download_file
+export -f verify_checksum
+export -f get_public_ip
+export -f add_hosts_entry
+export -f check_ssl_certificate

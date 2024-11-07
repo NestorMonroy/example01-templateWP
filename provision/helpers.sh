@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Módulo principal que integra todas las funciones helper
+# Punto de entrada único para todas las funciones helper
 
 # Definir la ruta base de los helpers
-HELPER_DIR="$(dirname "${BASH_SOURCE[0]}")"
+HELPER_DIR="$(dirname "${BASH_SOURCE[0]}")/helpers"
 
 # Verificar que estamos ejecutando como root
 if [[ $EUID -ne 0 ]]; then
