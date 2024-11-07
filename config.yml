@@ -1,20 +1,122 @@
 ###
-# Configuración para el entorno de desarrollo (Vagrant y Docker)
+# Configuración Global del Proyecto
 ###
-name: wordpress
+project:
+  name: wordpress
+  environment: development  # development, staging, production
+
+###
+# Configuración WordPress
+###
+wordpress:
+  site:
+    title: "Mi Sitio WordPress"
+    admin:
+      email: "admin@example.com"
+      user: "admin"
+      password: "tu_contraseña_segura"
+  
+  database:
+    name: "wordpress_db"
+    user: "wordpress_user"
+    password: "db_password"
+    host: "localhost"
+    prefix: "wp_"
+    charset: "utf8mb4"
+  
+  debug:
+    wp_debug: true
+    wp_debug_log: true
+    wp_debug_display: false
+    script_debug: false
+
+###
+# Configuración del Entorno
+###
+environment:
+  development:
+    # Dominios locales
+    domains:
+      - wordpress.local
+      # - wordpress-2.local  # Ejemplo para multisitio
+    
+    # Configuración de la máquina virtual
+    vm:
+      box: "ubuntu/bionic64"
+      memory: 2048
+      cpus: 2
+      network:
+        type: "private_network"
+        ip: "192.168.56.10"  # IP fija opcional
+    
+    # Configuración de PHP
+    php:
+      version: "7.4"
+      memory_limit: "256M"
+      upload_max_filesize: "64M"
+      post_max_size: "64M"
+      max_execution_time: 300
+    
+    # Sincronización con producción
+    sync:
+      database: ask      # always, never, ask
+      plugins: ask
+      themes: ask
+      uploads: ask
+    
+    # Características adicionales
+    features:
+      avahi: false       # Exponer .local en red local
+      ssl: true         # Generar certificado SSL local
+      xdebug: true      # Instalar Xdebug
+
+  # Configuración de Producción (comentada)
   #production:
-  # Esto se utiliza para obtener automáticamente datos de un entorno de staging (preproducción) o producción
-  #domain: example.com
-  #ssh_port: 12345
-#url: https://example.com
-development:
-  # Los dominios se mapean automáticamente a Vagrant mediante modificaciones en /etc/hosts o Avahi
-  domains:
-    - wordpress.local
-  # Permitir que Vagrant exponga dominios .local en la red local (fuera de la computadora portátil)
-  #avahi: true
-  # Si deseas obtener automáticamente datos de producción, usa 'always' (siempre) o configura
-  # en 'never' (nunca) para silenciar la pregunta 'yes/no' (sí/no) durante 'vagrant up'.
-  #pull_production_db: always
-  #pull_production_plugins: always
-  #pull_production_themes: always
+  #  domain: example.com
+  #  url: https://example.com
+  #  ssl: true
+  #  ssh:
+  #    port: 22
+  #    user: "deploy"
+  #  backups:
+  #    enabled: true
+  #    retention_days: 30
+  #    directory: "/backup"
+
+###
+# Plugins y Temas
+###
+plugins:
+  install:
+    - wordpress-seo:
+        version: latest
+    - wp-super-cache:
+        version: latest
+    - contact-form-7:
+        version: latest
+  activate:
+    - wordpress-seo
+    - contact-form-7
+
+themes:
+  install:
+    - twentytwentyfour:
+        version: latest
+  activate: twentytwentyfour
+
+###
+# Configuración de Servicios
+###
+services:
+  mysql:
+    version: "5.7"
+    port: 3306
+
+  apache:
+    version: "2.4"
+    port: 80
+    ssl_port: 443
+    modules:
+      - rewrite
+      - ssl
+      - headers

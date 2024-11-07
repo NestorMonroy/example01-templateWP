@@ -15,6 +15,10 @@ SAMPLE_CONFIG_FILE = File.join(DIR, 'config.sample.yml')
 yellow = "\033[33m"
 creset = "\033[0m"
 
+# Prevent logs from mkmf
+module MakeMakefile::Logging
+  @logfile = File::NULL
+end
 
 # Lista de plugins requeridos
 REQUIRED_PLUGINS = {
@@ -95,10 +99,6 @@ Vagrant.configure("2") do |config|
   config.vm.box = "ubuntu/bionic64"              # Usar Ubuntu 18.04 LTS
   config.vm.hostname = site_config['name']        # Establecer nombre de host desde config
 
-  # Configuración de dominios y aliases
-  domains = get_domains(site_config)
-  config.goodhosts.remove_on_suspend = true
-  config.goodhosts.aliases = domains - [config.vm.hostname]
 
   # Configuración de red pública (solo si se usa Avahi y es macOS)
   if site_config.dig('development', 'avahi') && has_internet? && is_osx?
@@ -116,6 +116,14 @@ Vagrant.configure("2") do |config|
 
   # Definir nombre de la máquina virtual
   config.vm.define "#{site_config['name']}-box"
+
+  # Configuración de dominios y aliases
+  domains = get_domains(site_config)
+  config.goodhosts.remove_on_suspend = true
+  config.goodhosts.aliases = domains - [config.vm.hostname]
+
+  # Deshabilitar el montaje por defecto
+  config.vm.synced_folder DIR, '/vagrant', disabled: true
 
   # Configuración de carpetas compartidas
   config.vm.synced_folder DIR, '/data/wordpress/',
@@ -147,7 +155,7 @@ Vagrant.configure("2") do |config|
                        name: "Instalar generate-ssl",
                        inline: <<-SHELL
       if [ ! -f "/usr/local/bin/generate-ssl" ]; then
-        cp /vagrant/provision/scripts/generate-ssl /usr/local/bin/
+        cp /data/wordpress/provision/scripts/generate-ssl /usr/local/bin/
         chmod +x /usr/local/bin/generate-ssl
       fi
     SHELL
@@ -166,10 +174,38 @@ Vagrant.configure("2") do |config|
                        inline: "echo '#{id_rsa_ssh_key_pub}' >> /home/vagrant/.ssh/authorized_keys && chmod 600 /home/vagrant/.ssh/authorized_keys"
   end
 
-    # Configurar triggers de Vagrant
-    vagrant_triggers(config, site_config)
+  # Configurar triggers de Vagrant
+  vagrant_triggers(config, site_config)
 
-    config.vm.provision "shell", path: "provision/core.sh"
+  # Aprovisionamiento
+  provision_path = File.join(DIR, 'provision')
+
+  # Estructura de aprovisionamiento con permisos específicos
+  PROVISION_DIRS = {
+    'scripts'   => { path: 'scripts/',   mode: '0755' }, # Scripts ejecutables
+    'config'    => { path: 'config/',    mode: '0644' }, # Archivos de configuración
+    'services'  => { path: 'services/',  mode: '0755' }, # Scripts de servicios
+    'sites'     => { path: 'sites/',     mode: '0644' }  # Configuraciones de sitios
+  }
+
+   # Crear estructura de directorios
+   FileUtils.mkdir_p(provision_path) unless File.exist?(provision_path)
+
+  PROVISION_DIRS.each do |name, info|
+    full_path = File.join(provision_path, info[:path])
+    FileUtils.mkdir_p(full_path) unless File.exist?(full_path)
+    FileUtils.chmod(info[:mode], full_path)
+  end
+
+
+  # Configurar aprovisionamiento con mejor manejo de errores
+  config.vm.provision "shell",
+                     path: "provision/core.sh",
+                     preserve_order: true,
+                     privileged: true,
+                     env: {
+                       "DEBIAN_FRONTEND" => "noninteractive"
+                     }
 end
 
 # Funciones auxiliares
@@ -234,14 +270,15 @@ end
 
 # Configuración de triggers de Vagrant
 def vagrant_triggers(vagrant_config, site_config)
-  # Trigger después de iniciar la máquina
   vagrant_config.trigger.after :up do |trigger|
     trigger.ruby do |env, machine|
       Dir.chdir(DIR)
       sleep 3  # Esperar a que la máquina termine de iniciar
 
-      # Ejecutar configuración inicial
-      system "vagrant ssh -c development-up"
+      # Ejecutar script de desarrollo
+      if File.exist?(File.join(DIR, 'provision/scripts/development-up'))
+        system "vagrant ssh -c 'sudo /data/wordpress/provision/scripts/development-up'"
+      end
 
       # Verificar hooks de git
       if File.exists?(File.join(DIR, '.git', 'hooks', 'pre-commit'))
@@ -258,14 +295,11 @@ def vagrant_triggers(vagrant_config, site_config)
             touch_file File.join(ssl_cert_path, 'trust.lock')
           end
         end
-      when /linux/  # Linux
-        # Configuraciones específicas para Linux
       end
 
-      # Ejecutar personalizaciones adicionales
+      # Ejecutar customizaciones adicionales
       if File.exist?(File.join(DIR, 'vagrant-up-customizer.sh'))
         notice 'Se encontró vagrant-up-customizer.sh y se está ejecutando...'
-        Dir.chdir(DIR)
         system 'sh ./vagrant-up-customizer.sh'
       end
     end

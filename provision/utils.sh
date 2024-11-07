@@ -121,3 +121,162 @@ copy_config_file() {
     # Copiar archivo de configuración
     sudo cp "$source_file" "$dest_file" || error_exit "Error al copiar el archivo de configuración de $source_file a $dest_file."
 }
+
+#!/bin/bash
+# provision/scripts/helpers.sh
+
+# Colores para los mensajes
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Definir directorios base
+WORDPRESS_DIR="/data/wordpress"
+PROVISION_DIR="$WORDPRESS_DIR/provision"
+SCRIPTS_DIR="$PROVISION_DIR/scripts"
+CONFIG_DIR="$PROVISION_DIR/config"
+
+# Función para imprimir mensajes
+log() {
+    echo -e "${GREEN}[PROVISION]:${NC} $1"
+}
+
+error() {
+    echo -e "${RED}[ERROR]:${NC} $1"
+}
+
+warning() {
+    echo -e "${YELLOW}[WARNING]:${NC} $1"
+}
+
+info() {
+    echo -e "${BLUE}[INFO]:${NC} $1"
+}
+
+# Función para verificar si un comando fue exitoso
+check_error() {
+    if [ $? -ne 0 ]; then
+        error "$1"
+        exit 1
+    fi
+}
+
+# Función para verificar si un directorio existe
+check_directory() {
+    if [ ! -d "$1" ]; then
+        error "Directorio no encontrado: $1"
+        exit 1
+    fi
+}
+
+# Función para verificar si un archivo existe
+check_file() {
+    if [ ! -f "$1" ]; then
+        error "Archivo no encontrado: $1"
+        exit 1
+    fi
+}
+
+# Función para verificar si un programa está instalado
+check_program() {
+    if ! command -v "$1" &> /dev/null; then
+        error "Programa no encontrado: $1"
+        exit 1
+    fi
+}
+
+# Función para crear directorios si no existen
+ensure_directory() {
+    if [ ! -d "$1" ]; then
+        mkdir -p "$1"
+        check_error "No se pudo crear el directorio: $1"
+    fi
+}
+
+# Función para copiar archivos con verificación
+safe_copy() {
+    if [ ! -f "$1" ]; then
+        error "Archivo fuente no encontrado: $1"
+        exit 1
+    fi
+    cp "$1" "$2"
+    check_error "No se pudo copiar el archivo: $1 -> $2"
+}
+
+# Función para establecer permisos
+set_permissions() {
+    local path="$1"
+    local perms="$2"
+    local owner="$3"
+    local group="$4"
+
+    chmod "$perms" "$path"
+    check_error "No se pudieron establecer los permisos en: $path"
+
+    chown "$owner:$group" "$path"
+    check_error "No se pudo cambiar el propietario en: $path"
+}
+
+# Función para verificar servicios
+check_service() {
+    if ! systemctl is-active --quiet "$1"; then
+        error "El servicio $1 no está activo"
+        exit 1
+    fi
+}
+
+# Función para recargar servicios de manera segura
+reload_service() {
+    systemctl reload "$1"
+    check_error "No se pudo recargar el servicio: $1"
+}
+
+# Función para reiniciar servicios de manera segura
+restart_service() {
+    systemctl restart "$1"
+    check_error "No se pudo reiniciar el servicio: $1"
+}
+
+# Función para verificar puerto en uso
+check_port() {
+    if netstat -tuln | grep -q ":$1 "; then
+        warning "El puerto $1 ya está en uso"
+    fi
+}
+
+# Función para mostrar el progreso
+show_progress() {
+    echo -e "${BLUE}-->${NC} $1"
+}
+
+# Función para leer configuración
+get_config() {
+    local config_file="$WORDPRESS_DIR/config.yml"
+    if [ ! -f "$config_file" ]; then
+        error "Archivo de configuración no encontrado: $config_file"
+        exit 1
+    fi
+    # Aquí podrías implementar la lógica para leer el archivo YAML
+    # Por ahora, es un placeholder
+}
+
+# Función para respaldar archivos antes de modificarlos
+backup_file() {
+    local file="$1"
+    if [ -f "$file" ]; then
+        cp "$file" "${file}.backup.$(date +%Y%m%d%H%M%S)"
+        check_error "No se pudo crear respaldo de: $file"
+    fi
+}
+
+# Exportar variables de entorno comunes
+export DEBIAN_FRONTEND=noninteractive
+export WORDPRESS_DIR PROVISION_DIR SCRIPTS_DIR CONFIG_DIR
+
+# Verificar que estamos ejecutando como root
+if [[ $EUID -ne 0 ]]; then
+   error "Este script debe ejecutarse como root"
+   exit 1
+fi
