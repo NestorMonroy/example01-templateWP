@@ -173,16 +173,16 @@ get_system_temperature() {
 check_root
 
 # Exportar funciones
-export -f noroot
-export -f check_root
-export -f check_system_requirements
-export -f get_os_info
-export -f get_total_memory
-export -f get_disk_space
-export -f get_cpu_cores
-export -f show_system_info
-export -f check_environment_requirements
-export -f check_os_version
-export -f get_cpu_usage
-export -f get_memory_usage
-export -f get_system_temperature
+#export -f noroot
+#export -f check_root
+#export -f check_system_requirements
+#export -f get_os_info
+#export -f get_total_memory
+#export -f get_disk_space
+#export -f get_cpu_cores
+#export -f show_system_info
+#export -f check_environment_requirements
+#export -f check_os_version
+#export -f get_cpu_usage
+#export -f get_memory_usage
+#export -f get_system_temperature

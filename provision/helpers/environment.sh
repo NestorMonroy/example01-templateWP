@@ -199,14 +199,14 @@ restore_environment() {
 }
 
 # Exportar funciones y variables
-export CURRENT_LOG_FILE
-export PROVISION_TIMESTAMP
-export -f init_provision_env
-export -f cleanup_provision_env
-export -f create_required_directories
-export -f clean_temp_files
-export -f get_last_provision_time
-export -f save_provision_state
-export -f get_provision_state
-export -f backup_environment
-export -f restore_environment
+#export CURRENT_LOG_FILE
+#export PROVISION_TIMESTAMP
+#export -f init_provision_env
+#export -f cleanup_provision_env
+#export -f create_required_directories
+#export -f clean_temp_files
+#export -f get_last_provision_time
+#export -f save_provision_state
+#export -f get_provision_state
+#export -f backup_environment
+#export -f restore_environment

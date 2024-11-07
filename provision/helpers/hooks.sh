@@ -80,7 +80,7 @@ run_post_hooks() {
 }
 
 # Exportar funciones para uso en otros scripts
-export -f run_pre_hooks
-export -f run_post_hooks
-export -f execute_hook
-export -f execute_hooks_in_dir
+#export -f run_pre_hooks
+#export -f run_post_hooks
+#export -f execute_hook
+#export -f execute_hooks_in_dir

@@ -121,21 +121,52 @@ kill_process() {
 # Gestión de puertos
 port_is_open() {
     local port="$1"
-    local host="${2:-localhost}"
-    local protocol="${3:-tcp}"
+    local protocol="${2:-tcp}"
 
     case "$protocol" in
         tcp)
-            nc -z -w2 "$host" "$port" >/dev/null 2>&1
+            netstat -tuln | grep -q ":${port} "
             ;;
         udp)
-            nc -z -u -w2 "$host" "$port" >/dev/null 2>&1
+            netstat -uln | grep -q ":${port} "
             ;;
         *)
             log_error "Protocolo no soportado: $protocol"
             return 1
             ;;
     esac
+}
+
+is_port_in_use() {
+    local port="$1"
+    local protocol="${2:-tcp}"
+
+    if port_is_open "$port" "$protocol"; then
+        log_warning "Puerto $port ($protocol) está en uso"
+        return 0
+    else
+        log_info "Puerto $port ($protocol) está disponible"
+        return 1
+    fi
+}
+
+find_next_available_port() {
+    local start_port="$1"
+    local end_port="${2:-65535}"
+    local protocol="${3:-tcp}"
+
+    log_info "Buscando puerto disponible desde $start_port hasta $end_port..."
+
+    for port in $(seq "$start_port" "$end_port"); do
+        if ! is_port_in_use "$port" "$protocol"; then
+            log_success "Puerto disponible encontrado: $port"
+            echo "$port"
+            return 0
+        fi
+    done
+
+    log_error "No se encontraron puertos disponibles entre $start_port y $end_port"
+    return 1
 }
 
 wait_for_port() {
@@ -148,7 +179,7 @@ wait_for_port() {
     log_info "Esperando que $description esté disponible..."
 
     local counter=0
-    while ! port_is_open "$port" "$host" "$protocol"; do
+    while ! port_is_open "$port" "$protocol"; do
         counter=$((counter + 1))
         if [ "$counter" -ge "$timeout" ]; then
             log_error "Timeout esperando por $description"
@@ -163,7 +194,7 @@ wait_for_port() {
     return 0
 }
 
-# Gestión de dependencias de servicios
+# Función para verificar dependencias de servicios
 check_service_dependencies() {
     local service="$1"
     local deps
@@ -180,57 +211,15 @@ check_service_dependencies() {
     return 0
 }
 
-# Reiniciar servicio de forma segura
-restart_service_safely() {
-    local service="$1"
-    local timeout="${2:-30}"
-
-    log_info "Reiniciando servicio $service de forma segura..."
-
-    # Verificar que el servicio existe
-    if ! service_exists "$service"; then
-        log_error "Servicio no encontrado: $service"
-        return 1
-    fi
-
-    # Verificar dependencias
-    if ! check_service_dependencies "$service"; then
-        log_error "Dependencias no satisfechas para: $service"
-        return 1
-    }
-
-    # Intentar reload primero si es posible
-    if systemctl reload "$service" 2>/dev/null; then
-        log_success "Servicio recargado exitosamente: $service"
-        return 0
-    fi
-
-    # Si reload no es posible, hacer restart
-    service_control restart "$service"
-
-    # Esperar a que el servicio esté activo
-    local counter=0
-    while ! service_is_running "$service"; do
-        sleep 1
-        counter=$((counter + 1))
-        if [ "$counter" -ge "$timeout" ]; then
-            log_error "Timeout esperando que el servicio esté activo"
-            return 1
-        fi
-    done
-
-    log_success "Servicio reiniciado exitosamente: $service"
-    return 0
-}
-
 # Exportar funciones
-export -f service_exists
-export -f service_is_running
-export -f service_is_enabled
-export -f service_control
-export -f process_is_running
-export -f kill_process
-export -f port_is_open
-export -f wait_for_port
-export -f check_service_dependencies
-export -f restart_service_safely
+#export -f service_exists
+#export -f service_is_running
+#export -f service_is_enabled
+#export -f service_control
+#export -f process_is_running
+#export -f kill_process
+#export -f port_is_open
+#export -f is_port_in_use
+#export -f find_next_available_port
+#export -f wait_for_port
+#export -f check_service_dependencies

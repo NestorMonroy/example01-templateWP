@@ -207,11 +207,11 @@ check_ssl_certificate() {
 }
 
 # Exportar funciones
-export -f check_internet_connection
-export -f check_host_connection
-export -f check_required_services
-export -f download_file
-export -f verify_checksum
-export -f get_public_ip
-export -f add_hosts_entry
-export -f check_ssl_certificate
+#export -f check_internet_connection
+#export -f check_host_connection
+#export -f check_required_services
+#export -f download_file
+#export -f verify_checksum
+#export -f get_public_ip
+#export -f add_hosts_entry
+#export -f check_ssl_certificate

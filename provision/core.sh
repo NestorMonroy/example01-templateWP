@@ -1,136 +1,111 @@
-source /vagrant/provision/utils.sh
-source /vagrant/provision/apache.sh
-source /vagrant/provision/mysql.sh
-source /vagrant/provision/wordpress.sh
+#!/usr/bin/env bash
 
-# Actualizar la lista de paquetes y luego actualizar todos los paquetes instalados
-update
-apt_packages_upgrade
+# Cargar helpers y configuración
+source "$(dirname "${BASH_SOURCE[0]}")/helpers.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 
-# Lista de paquetes a instalar
-PACKAGES=(
-    apache2
-    ghostscript
-    libapache2-mod-php
-    mysql-server
-    php
-    php-bcmath
-    php-curl
-    php-imagick
-    php-intl
-    php-json
-    php-mbstring
-    php-mysql
-    php-xml
-    php-zip
-    php-xdebug
-)
+# Función para verificar dependencias
+check_provision_dependencies() {
+    local dependencies=(
+        "wget"
+        "curl"
+        "git"
+        "tar"
+        "gzip"
+        "mysql"
+    )
 
-# Lista de directorios a crear
-DIRECTORIES=(
-    /srv/www
-    /srv/backup
-    /usr/share/adminer
-)
+    log_info "Verificando dependencias..."
+    install_packages "${dependencies[@]}"
+}
 
-# URL de WordPress
-WORDPRESS_URL="https://wordpress.org/latest.tar.gz"
-WORDPRESS_DESTINATION="/vagrant/htdocs"
-WORDPRESS_USER="www-data"
-WORDPRESS_USER_FILE_CONF="/vagrant/provision/conf/wordpress.conf"
-WORDPRESS_CONF="/etc/apache2/sites-available/wordpress.conf"
+# Función para ejecutar pre-hooks
+run_provision_pre_hooks() {
+    local hooks_dir="${PROVISION_DIR}/hooks/pre"
 
-WORDPRESS_USER_INSTALLER="/vagrant/provision/conf/wordpress_installer.php"
-WORDPRESS_INSTALLER="/srv/www/wordpress_installer.php"
+    if [ -d "$hooks_dir" ]; then
+        log_info "Ejecutando pre-hooks..."
 
-WORDPRESS_USER_C_INSTALLER="/vagrant/provision/conf/Installer.php"
-WORDPRESS_C_INSTALLER="/srv/www/Installer.php"
+        for hook in "$hooks_dir"/*.sh; do
+            if [ -f "$hook" ]; then
+                log_info "Ejecutando hook: $(basename "$hook")"
+                if ! bash "$hook"; then
+                    log_error "Hook falló: $(basename "$hook")"
+                    return 1
+                fi
+            fi
+        done
+    fi
+}
 
-# URL de Adminer
-ADMINER_URL="https://github.com/vrana/adminer/releases/download/v4.8.1/adminer-4.8.1-en.php"
-ADMINER_DESTINATION="/usr/share/adminer"
-ADMINER_USER_FILE_CONF="/vagrant/provision/conf/adminer.conf"
-ADMINER_CONF="/etc/apache2/conf-available/adminer.conf"
+# Función para ejecutar post-hooks
+run_provision_post_hooks() {
+    local hooks_dir="${PROVISION_DIR}/hooks/post"
 
-# Lista de sitios a habilitar/deshabilitar
-SITES_TO_ENABLE=(
-    wordpress
-)
+    if [ -d "$hooks_dir" ]; then
+        log_info "Ejecutando post-hooks..."
 
-SITES_TO_DISABLE=(
-    000-default
-)
+        for hook in "$hooks_dir"/*.sh; do
+            if [ -f "$hook" ]; then
+                log_info "Ejecutando hook: $(basename "$hook")"
+                if ! bash "$hook"; then
+                    log_warning "Hook falló: $(basename "$hook")"
+                fi
+            fi
+        done
+    fi
+}
 
-# Lista de módulos a habilitar
-MODULES_TO_ENABLE=(
-    rewrite
-    ssl
-)
+# Función principal de provisión
+main_provision() {
+    # Mostrar información inicial
+    log_header "Iniciando Provisión"
+    log_info "Fecha: $(date)"
+    log_info "Sistema: $(get_system_info)"
 
-# Variables para la base de datos
-db_name="wordpress"
-db_user="wordpress"
-db_password="admin123"
-wp_directory="/vagrant/htdocs/wordpress"
+    # Verificar requisitos básicos
+    check_system_requirements 512 1
+    check_internet_connection
+    check_disk_space 1000 "/data"
 
-# Instalar todos los paquetes
-for package in "${PACKAGES[@]}"; do
-    install_package "$package"
-done
+    # Verificar dependencias
+    check_provision_dependencies
 
-# Crear los directorios necesarios
-create_directories "${DIRECTORIES[@]}"
+    # Ejecutar pre-hooks
+    run_provision_pre_hooks || {
+        log_error "Los pre-hooks fallaron"
+        return 1
+    }
 
-# Asignar permisos
-set_permissions_dir "www-data" /vagrant/htdocs
-set_permissions_dir "www-data" /vagrant/htdocs/wp-content/
+    # Realizar tareas principales de provisión
+    log_header "Tareas Principales de Provisión"
 
-set_permissions "vagrant:vagrant" "755" "/vagrant/htdocs/wp-content/"
+    local scripts=(
+        "setup-php.sh"
+        "setup-mysql.sh"
+        "setup-wordpress.sh"
+    )
 
-# Asignar permisos a adminer
-set_permissions "vagrant:vagrant" "755" "/usr/share/adminer"
+    for script in "${scripts[@]}"; do
+        local script_path="${PROVISION_DIR}/scripts/${script}"
+        if [ -f "$script_path" ]; then
+            log_info "Ejecutando: $script"
+            if ! bash "$script_path"; then
+                log_error "Script falló: $script"
+                return 1
+            fi
+        else
+            log_error "Script no encontrado: $script"
+            return 1
+        fi
+    done
 
+    # Ejecutar post-hooks
+    run_provision_post_hooks
 
-# Instalar WordPress
-install_archive "$WORDPRESS_URL" "$WORDPRESS_DESTINATION" "$WORDPRESS_USER"
+    log_success "Provisión completada exitosamente"
+    return 0
+}
 
-# Copiar archivo de configuración de WordPress
-copy_config_file "$WORDPRESS_USER_FILE_CONF" "$WORDPRESS_CONF"
-
-# Copiar el archivo de instalación de WordPress Installer
-copy_config_file "$WORDPRESS_USER_INSTALLER" "$WORDPRESS_INSTALLER"
-
-copy_config_file "$WORDPRESS_USER_C_INSTALLER" "$WORDPRESS_C_INSTALLER"
-
-
-# Ejecutar el script PHP para cambiar wp-content
-php "$WORDPRESS_INSTALLER"
-
-# Instalar Adminer
-download_file "$ADMINER_URL" "$ADMINER_DESTINATION"
-
-# Habilitar sitios
-enable_sites "${SITES_TO_ENABLE[@]}"
-
-# Deshabilitar sitios predeterminados
-disable_sites "${SITES_TO_DISABLE[@]}"
-
-# Habilitar módulos necesarios
-enable_modules "${MODULES_TO_ENABLE[@]}"
-
-# Recargar Apache para aplicar cambios
-reload_apache
-
-# Configurar la base de datos de WordPress
-  "$db_name" "$db_user" "$db_password"
-
-# Configurar WordPress
-configure_wordpress "$wp_directory" "$db_name" "$db_user" "$db_password"
-
-# Copiar archivo de configuración de Adminer
-copy_config_file "$ADMINER_USER_FILE_CONF" "$ADMINER_CONF"
-
-execute_apache_command "a2enconf adminer" "a2enmod rewrite"
-
-# Recargar Apache para aplicar cambios
-reload_apache
+# Ejecutar provisión
+main_provision
