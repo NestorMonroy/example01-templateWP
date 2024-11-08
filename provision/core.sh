@@ -9,9 +9,11 @@ check_provision_dependencies() {
         "wget"
         "curl"
         "git"
+        "bc"
         "tar"
         "gzip"
         "mysql"
+
     )
 
     log_info "Verificando dependencias..."

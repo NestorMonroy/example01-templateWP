@@ -396,6 +396,59 @@ create_temp_dir() {
     return 0
 }
 
+# Obtener espacio libre en MB para un directorio
+# Uso: espacio_libre=$(get_free_space_mb "/var/www")
+# Ejemplo:
+#   if [ "$(get_free_space_mb "/var")" -lt 1000 ]; then
+#       echo "Espacio insuficiente"
+#   fi
+get_free_space_mb() {
+    local dir="$1"
+    df -m "$dir" | awk 'NR==2 {print $4}'
+}
+
+# Obtener espacio total en MB para un directorio
+# Uso: espacio_total=$(get_total_space_mb "/var/www")
+# Ejemplo:
+#   echo "Espacio total: $(get_total_space_mb "/var")MB"
+get_total_space_mb() {
+    local dir="$1"
+    df -m "$dir" | awk 'NR==2 {print $2}'
+}
+
+# Obtener el tamaño de un directorio en MB
+# Uso: tamaño=$(get_directory_size_mb "/var/www")
+# Ejemplo:
+#   echo "Tamaño del directorio: $(get_directory_size_mb "/var/www")MB"
+get_directory_size_mb() {
+    local dir="$1"
+    if [ -d "$dir" ]; then
+        du -sm "$dir" | cut -f1
+    else
+        echo "0"
+    fi
+}
+
+# Verificar permisos de escritura en un directorio
+# Uso: check_write_permission "/var/www"
+# Ejemplo:
+#   if check_write_permission "/var/www"; then
+#       echo "Tenemos permisos de escritura"
+#   fi
+check_write_permission() {
+    local dir="$1"
+    local test_file="$dir/.write_test"
+
+    # Intentar crear un archivo de prueba
+    if ! touch "$test_file" 2>/dev/null; then
+        return 1
+    fi
+
+    # Limpiar archivo de prueba
+    rm -f "$test_file"
+    return 0
+}
+
 # Ejemplo completo de uso del script
 : '
 #!/bin/bash
@@ -436,6 +489,10 @@ set_permissions "/var/www/app" 644 755 "
 #export -f check_disk_space
 #export -f create_temp_file
 #export -f create_temp_dir
+#export -f get_free_space_mb
+#export -f get_total_space_mb
+#export -f get_directory_size_mb
+#export -f check_write_permission
 
 # Variables exportadas
 #export DEFAULT_FILE_MODE

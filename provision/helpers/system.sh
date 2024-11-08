@@ -89,6 +89,14 @@ get_os_info() {
         uname -s
     fi
 }
+# Obtener memoria disponible en MB
+# Uso: memoria_disponible=$(get_available_memory)
+# Ejemplo:
+#   echo "Memoria disponible: $(get_available_memory) MB"
+get_available_memory() {
+    free -m | awk '/^Mem:/ {print $7}'
+}
+
 
 # Funciones para obtener recursos del sistema
 # Uso: memoria=$(get_total_memory)
@@ -191,10 +199,12 @@ check_os_version() {
 #   cpu=$(get_cpu_usage)
 #   memoria=$(get_memory_usage)
 #   temp=$(get_system_temperature)
+# Modificar la función existente get_cpu_usage para mayor precisión
 get_cpu_usage() {
-    local cpu_usage=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}')
-    echo "$cpu_usage"
+    local cpu_idle=$(top -bn1 | grep "Cpu(s)" | awk '{print $8}' | cut -d. -f1)
+    echo $((100 - cpu_idle))
 }
+
 
 get_memory_usage() {
     local memory_usage=$(free | grep Mem | awk '{print $3/$2 * 100.0}')
@@ -208,6 +218,80 @@ get_system_temperature() {
         echo "N/A"
     fi
 }
+
+# Obtener modelo de CPU
+# Uso: modelo=$(get_cpu_model)
+# Ejemplo:
+#   echo "Modelo de CPU: $(get_cpu_model)"
+get_cpu_model() {
+    grep "model name" /proc/cpuinfo | head -n1 | cut -d: -f2 | sed 's/^[ \t]*//'
+}
+
+# Obtener velocidad de CPU en MHz
+# Uso: velocidad=$(get_cpu_speed)
+# Ejemplo:
+#   echo "Velocidad de CPU: $(get_cpu_speed) MHz"
+get_cpu_speed() {
+    grep "cpu MHz" /proc/cpuinfo | head -n1 | cut -d: -f2 | sed 's/^[ \t]*//' | cut -d. -f1
+}
+
+# Verifica el estado de throttling del CPU mediante sensores térmicos
+# Retorna diferentes códigos según el resultado.
+# Esta función comprueba si el CPU está experimentando throttling debido a altas temperaturas
+# monitoreando los sensores térmicos del sistema.
+#
+# Uso: check_cpu_throttling
+#      Códigos de retorno:
+#      0 - Se detectó throttling (temperatura > 80°C)
+#      1 - No hay throttling (temperatura normal)
+#      2 - No se puede verificar (sensores no disponibles o error de lectura)
+#
+# Ejemplo:
+#   check_cpu_throttling
+#   case $? in
+#       0) echo "¡Advertencia! CPU en throttling" ;;
+#       1) echo "Temperatura CPU normal" ;;
+#       2) echo "No se puede verificar temperatura" ;;
+#   esac
+check_cpu_throttling() {
+    # 1. Verifica si existen los sensores
+    if [ ! -d "/sys/class/thermal/thermal_zone0" ]; then
+        log_warning "No se detectaron sensores térmicos en el sistema"
+        return 2  # Código especial: no hay sensores
+    fi
+
+    # 2. Verifica si se puede acceder al archivo de temperatura
+    local temp_file="/sys/class/thermal/thermal_zone0/temp"
+    if [ ! -f "$temp_file" ] || [ ! -r "$temp_file" ]; then
+        log_warning "No se puede acceder al sensor de temperatura"
+        return 2
+    fi
+
+    # 3. Intenta leer la temperatura
+    local temp=$(cat "$temp_file" 2>/dev/null)
+    if [ -z "$temp" ]; then
+        log_warning "No se pudo leer la temperatura del CPU"
+        return 1
+    fi
+
+    # 4. Procesa y verifica la temperatura
+    temp=$((temp/1000))
+    if [ "$temp" -gt 80 ]; then
+        log_warning "Temperatura CPU elevada: ${temp}°C"
+        return 0  # Hay throttling
+    fi
+
+    return 1  # No hay throttling
+}
+
+# Obtener carga promedio del sistema
+# Uso: carga=$(get_load_average)
+# Ejemplo:
+#   echo "Carga del sistema: $(get_load_average)"
+get_load_average() {
+    cut -d ' ' -f1 /proc/loadavg
+}
+
 
 # Ejemplo de uso completo del script
 : '
@@ -250,3 +334,8 @@ check_root
 #export -f get_cpu_usage
 #export -f get_memory_usage
 #export -f get_system_temperature
+#export -f get_available_memory
+#export -f get_cpu_model
+#export -f get_cpu_speed
+#export -f check_cpu_throttling
+#export -f get_load_average

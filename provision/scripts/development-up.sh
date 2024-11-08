@@ -1,169 +1,102 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Colores para los mensajes
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+# Cargar helpers necesarios
+source "$(dirname "$0")/helpers/logging.sh"
+source "$(dirname "$0")/helpers/error.sh"
 
-# Directorio principal
-WORDPRESS_DIR="/data/wordpress"
-CONFIG_FILE="/vagrant/config.yml"
+log_header "Configuración inicial post-arranque de la máquina virtual"
 
-# Función para mostrar mensajes
-log_message() {
-    local level=$1
-    local message=$2
-    case $level in
-        "info")
-            echo -e "${GREEN}[INFO]${NC} $message"
-            ;;
-        "warn")
-            echo -e "${YELLOW}[WARN]${NC} $message"
-            ;;
-        "error")
-            echo -e "${RED}[ERROR]${NC} $message"
-            ;;
-    esac
-}
+# 1. Verificación y configuración de usuarios del sistema
+setup_system_users() {
+    log_info "Verificando usuarios y grupos del sistema..."
 
-# Función para verificar si un comando existe
-command_exists() {
-    command -v "$1" >/dev/null 2>&1
-}
-
-# Función para verificar requisitos
-check_requirements() {
-    log_message "info" "Verificando requisitos..."
-
-    # Verificar que estamos en ambiente Vagrant
-    if [ ! -d "/vagrant" ]; then
-        log_message "error" "Este script debe ejecutarse dentro de Vagrant"
-        exit 1
-    }
-
-    # Verificar que existe el archivo de configuración
-    if [ ! -f "$CONFIG_FILE" ]; then
-        log_message "error" "No se encuentra el archivo config.yml"
-        exit 1
-    }
-
-    # Verificar que WP-CLI está instalado
-    if ! command_exists wp; then
-        log_message "error" "WP-CLI no está instalado"
-        exit 1
-    }
-}
-
-# Función para configurar WordPress
-setup_wordpress() {
-    log_message "info" "Configurando WordPress..."
-
-    cd "$WORDPRESS_DIR" || exit 1
-
-    # Verificar si WordPress ya está instalado
-    if ! wp core is-installed --quiet; then
-        log_message "info" "Instalando WordPress..."
-
-        # Obtener valores de config.yml usando Ruby (ya que está en formato YAML)
-        site_title=$(ruby -ryaml -e "puts YAML.load_file('$CONFIG_FILE')['name']")
-        admin_user="admin"
-        admin_password=$(openssl rand -base64 12)
-        admin_email="admin@${site_title}.local"
-
-        # Instalar WordPress
-        wp core install \
-            --url="https://${site_title}.local" \
-            --title="$site_title" \
-            --admin_user="$admin_user" \
-            --admin_password="$admin_password" \
-            --admin_email="$admin_email" \
-            --skip-email
-
-        # Guardar credenciales en un archivo
-        echo "WordPress instalado con las siguientes credenciales:" > /vagrant/.vagrant/wp-credentials.txt
-        echo "URL: https://${site_title}.local" >> /vagrant/.vagrant/wp-credentials.txt
-        echo "Usuario: $admin_user" >> /vagrant/.vagrant/wp-credentials.txt
-        echo "Contraseña: $admin_password" >> /vagrant/.vagrant/wp-credentials.txt
-        chmod 600 /vagrant/.vagrant/wp-credentials.txt
-
-        log_message "info" "Credenciales guardadas en .vagrant/wp-credentials.txt"
-    else
-        log_message "info" "WordPress ya está instalado"
-    fi
-}
-
-# Función para configurar el entorno de desarrollo
-setup_development_environment() {
-    log_message "info" "Configurando entorno de desarrollo..."
-
-    cd "$WORDPRESS_DIR" || exit 1
-
-    # Activar modo debug
-    wp config set WP_DEBUG true --raw
-    wp config set WP_DEBUG_LOG true --raw
-    wp config set WP_DEBUG_DISPLAY false --raw
-
-    # Desactivar actualizaciones automáticas
-    wp config set AUTOMATIC_UPDATER_DISABLED true --raw
-
-    # Configurar entorno de desarrollo
-    wp config set WP_ENVIRONMENT_TYPE development
-
-    # Instalar y activar plugins útiles para desarrollo
-    plugins=(
-        "query-monitor"
-        "debug-bar"
-        "theme-check"
-        "user-switching"
+    # Array de usuarios necesarios: usuario:grupo:shell:descripción
+    local system_users=(
+        "www-data:www-data:/usr/sbin/nologin:Web Server User"
+        "nginx:nginx:/usr/sbin/nologin:Nginx User"
+        "ssl-cert:ssl-cert:/usr/sbin/nologin:SSL Certificate User"
     )
 
-    for plugin in "${plugins[@]}"; do
-        if ! wp plugin is-installed "$plugin"; then
-            wp plugin install "$plugin" --activate
-        elif ! wp plugin is-active "$plugin"; then
-            wp plugin activate "$plugin"
-        fi
-    done
+    for user_info in "${system_users[@]}"; do
+        IFS=':' read -r user group shell description <<< "$user_info"
 
-    # Configurar permisos
-    log_message "info" "Configurando permisos..."
-    sudo chown -R vagrant:www-data .
-    sudo find . -type d -exec chmod 775 {} \;
-    sudo find . -type f -exec chmod 664 {} \;
-    sudo chmod 660 wp-config.php
+        # Crear grupo si no existe
+        if ! getent group "$group" >/dev/null; then
+            log_info "Creando grupo $group..."
+            groupadd -f "$group"
+        fi
+
+        # Crear usuario si no existe
+        if ! id -u "$user" >/dev/null 2>&1; then
+            log_info "Creando usuario $user ($description)..."
+            useradd -r -s "$shell" -g "$group" -d "/nonexistent" -c "$description" "$user"
+        fi
+
+        # Asegurar que el usuario esté en su grupo principal
+        usermod -g "$group" "$user"
+    }
+
+    # Configurar grupos adicionales para usuarios
+    # Por ejemplo, añadir www-data al grupo ssl-cert para acceso a certificados
+    usermod -a -G ssl-cert www-data
+
+    log_success "Usuarios y grupos del sistema configurados correctamente"
 }
 
-# Función para limpiar y optimizar
-cleanup_and_optimize() {
-    log_message "info" "Limpiando y optimizando..."
+# 2. Verificar requisitos del sistema
+check_system_requirements() {
+    log_info "Verificando requisitos del sistema..."
 
-    cd "$WORDPRESS_DIR" || exit 1
+    if [ "$(id -u)" -ne 0 ]; then
+        log_error "Este script debe ejecutarse como root"
+        exit 1
+    fi
 
-    # Eliminar temas y plugins por defecto innecesarios
-    wp theme delete twentytwenty twentytwentyone twentytwentytwo
-    wp plugin delete hello akismet
+    if [ ! -f /etc/os-release ] || ! grep -q "Ubuntu" /etc/os-release; then
+        log_error "Este script está diseñado para Ubuntu"
+        exit 1
+    fi
 
-    # Eliminar posts y páginas de ejemplo
-    wp post delete $(wp post list --post_type=post --format=ids) --force
-    wp post delete $(wp post list --post_type=page --format=ids) --force
+    log_success "Requisitos del sistema verificados correctamente"
+}
 
-    # Optimizar la base de datos
-    wp db optimize
+# 3. Crear directorios base con permisos correctos
+setup_base_directories() {
+    log_info "Configurando directorios base..."
+
+    # Directorios críticos del sistema
+    local base_dirs=(
+        "/var/log/wordpress:755:www-data:www-data"
+        "/var/www:755:www-data:www-data"
+        "/var/log/nginx:755:nginx:adm"
+        "/etc/nginx/ssl:750:root:ssl-cert"
+        "/tmp/wordpress:777:www-data:www-data"
+    )
+
+    for dir_info in "${base_dirs[@]}"; do
+        IFS=':' read -r dir perms owner group <<< "$dir_info"
+
+        if [ ! -d "$dir" ]; then
+            mkdir -p "$dir"
+        fi
+
+        chmod "$perms" "$dir"
+        chown "${owner}:${group}" "$dir"
+    done
+
+    log_success "Directorios base configurados correctamente"
 }
 
 # Función principal
 main() {
-    log_message "info" "Iniciando configuración del entorno de desarrollo WordPress..."
+    log_header "Iniciando configuración post-arranque"
 
-    check_requirements
-    setup_wordpress
-    setup_development_environment
-    cleanup_and_optimize
+    check_system_requirements
+    setup_system_users
+    setup_base_directories
 
-    log_message "info" "¡Configuración completada!"
-    log_message "info" "Puedes encontrar las credenciales en .vagrant/wp-credentials.txt"
+    log_success "Configuración post-arranque completada exitosamente"
 }
 
-# Ejecutar el script
-main
+# Ejecutar script
+main "$@"
