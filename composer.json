@@ -26,6 +26,9 @@
     "wpackagist-plugin/wordpress-seo": "^21.0",
     "wpackagist-plugin/wordfence": "^7.0",
     "wpackagist-plugin/redis-cache": "^2.0",
+    "wpackagist-plugin/polylang": "^3.5",
+    "wpackagist-plugin/w3-total-cache": "^2.0",
+
     "wpackagist-plugin/wp-mail-smtp": "^3.0",
 
     "wpackagist-theme/twentytwentyfour": "*"
@@ -76,10 +79,22 @@
       "WordPress\\Setup::setupDropins",
       "WordPress\\Setup::setupEnvironment"
     ],
+    "download-languages": [
+      "@php -r \"shell_exec('wp language core install es_ES --allow-root --path=htdocs/wordpress');\"",
+      "@php -r \"shell_exec('wp language core install en_GB --allow-root --path=htdocs/wordpress');\""
+    ],
+    "update-languages": [
+      "@php -r \"shell_exec('wp language core update --allow-root --path=htdocs/wordpress');\""
+    ],
     "post-update-cmd": [
       "WordPress\\Setup::symlinkWPContent",
       "WordPress\\Setup::setupPermissions",
-      "WordPress\\Setup::setupDropins"
+      "WordPress\\Setup::setupDropins",
+      "@php -r \"copy('config/dropins/advanced-cache.php', 'htdocs/wp-content/advanced-cache.php');\"",
+      "@php -r \"copy('config/dropins/object-cache.php', 'htdocs/wp-content/object-cache.php');\"",
+      "@php -r \"file_exists('config/dropins/db.php') && copy('config/dropins/db.php', 'htdocs/wp-content/db.php');\"",
+      "@php -r \"chmod('htdocs/wp-content/uploads', 0775);\"",
+      "App\\Installer::createDropins"
     ],
     "test": [
       "@lint",
