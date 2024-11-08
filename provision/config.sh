@@ -23,6 +23,17 @@ export CURRENT_LOG_FILE=""
 export PROVISION_STEP=""
 export IS_INITIALIZED=false
 
+# Variables de wordpress
+export WORDPRESS_PATH="/var/www/wordpress"
+export BACKUP_PATH="/var/backups/wordpress"
+export MIN_MEMORY_MB=512
+export MIN_DISK_GB=5
+export MIN_CPU_CORES=1
+export REQUIRED_PORTS=(80 443 3306)
+export REQUIRED_PACKAGES=(php mysql-server nginx)
+
+
+
 # Función para inicializar el entorno
 init_provision_env() {
     # Evitar inicialización múltiple

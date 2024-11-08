@@ -171,7 +171,44 @@ fi
 '
 
 # Exportar funciones para uso en otros scripts
-export -f run_pre_hooks
-export -f run_post_hooks
-export -f execute_hook
-export -f execute_hooks_in_dir
+#export -f run_pre_hooks
+#export -f run_post_hooks
+#export -f execute_hook
+#export -f execute_hooks_in_dir
+
+# Registro de hooks en el sistema
+register_prehooks() {
+    # Cargar el sistema de hooks
+    load_helpers "hooks.sh" "logging.sh"
+
+    log_info "Registrando pre-hooks de WordPress"
+
+    # Registrar los hooks en orden
+    register_hook "pre-provision" "check_system_requirements" 10
+    register_hook "pre-provision" "backup_existing_installation" 20
+    register_hook "pre-provision" "check_required_ports" 30
+    register_hook "pre-provision" "check_dependencies" 40
+    register_hook "pre-provision" "prepare_directories" 50
+
+    log_success "Pre-hooks registrados exitosamente"
+}
+
+# Inicialización
+init_wordpress_prehooks() {
+    # Cargar configuración global si existe
+    if [ -f "/etc/wordpress/config.sh" ]; then
+        source "/etc/wordpress/config.sh"
+    fi
+
+    # Configuración por defecto si no está definida
+    : ${WORDPRESS_PATH:="/var/www/wordpress"}
+    : ${BACKUP_PATH:="/var/backups/wordpress"}
+    : ${MIN_MEMORY_MB:=512}
+    : ${MIN_DISK_GB:=5}
+    : ${MIN_CPU_CORES:=1}
+    : ${REQUIRED_PORTS:=(80 443 3306)}
+    : ${REQUIRED_PACKAGES:=(php mysql-server nginx)}
+
+    # Registrar los pre-hooks
+    register_prehooks
+}

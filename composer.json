@@ -1,21 +1,122 @@
 {
-  "name": "",
-  "description": "description",
-  "minimum-stability": "stable",
-  "license": "proprietary",
-  "authors": [
+  "name": "wordpress/site",
+  "type": "project",
+  "license": "GPL-3.0-or-later",
+  "description": "WordPress setup with Vagrant integration",
+  "repositories": [
     {
-      "name": "quauhtli",
-      "email": "email@example.com"
+      "type": "composer",
+      "url": "https://wpackagist.org",
+      "only": [
+        "wpackagist-plugin/*",
+        "wpackagist-theme/*"
+      ]
     }
   ],
-    "require": {
-      "php": ">=7.4",
-      "vlucas/phpdotenv": "^5.3"
-    },
-    "config": {
-      "optimize-autoloader": true,
-      "preferred-install": "dist",
-      "sort-packages": true
+  "require": {
+    "php": ">=8.0",
+    "composer/installers": "^2.2",
+    "vlucas/phpdotenv": "^5.5",
+    "oscarotero/env": "^2.1",
+    "roots/bedrock-autoloader": "^1.0",
+    "roots/wp-password-bcrypt": "1.1.0",
+    "johnpbloch/wordpress-core-installer": "^2.0",
+    "johnpbloch/wordpress-core": "^6.0",
+
+    "wpackagist-plugin/wordpress-seo": "^21.0",
+    "wpackagist-plugin/wordfence": "^7.0",
+    "wpackagist-plugin/redis-cache": "^2.0",
+    "wpackagist-plugin/wp-mail-smtp": "^3.0",
+
+    "wpackagist-theme/twentytwentyfour": "*"
+  },
+  "require-dev": {
+    "wpackagist-plugin/query-monitor": "^3.0",
+    "wpackagist-plugin/debug-bar": "^1.0",
+    "squizlabs/php_codesniffer": "^3.7.1",
+    "wp-coding-standards/wpcs": "^3.0",
+    "phpunit/phpunit": "^9.6",
+    "roave/security-advisories": "dev-latest"
+  },
+  "config": {
+    "optimize-autoloader": true,
+    "preferred-install": "dist",
+    "sort-packages": true,
+    "allow-plugins": {
+      "composer/installers": true,
+      "johnpbloch/wordpress-core-installer": true
     }
+  },
+  "extra": {
+    "installer-paths": {
+      "htdocs/wp-content/mu-plugins/{$name}/": ["type:wordpress-muplugin"],
+      "htdocs/wp-content/plugins/{$name}/": ["type:wordpress-plugin"],
+      "htdocs/wp-content/themes/{$name}/": ["type:wordpress-theme"]
+    },
+    "wordpress-install-dir": "htdocs/wordpress"
+  },
+  "autoload": {
+    "psr-4": {
+      "App\\": "src/",
+      "WordPress\\": "scripts/WordPress/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "post-root-package-install": [
+      "WordPress\\Setup::createEnvFile"
+    ],
+    "post-install-cmd": [
+      "WordPress\\Setup::symlinkWPContent",
+      "WordPress\\Setup::setupPermissions",
+      "WordPress\\Setup::setupDropins",
+      "WordPress\\Setup::setupEnvironment"
+    ],
+    "post-update-cmd": [
+      "WordPress\\Setup::symlinkWPContent",
+      "WordPress\\Setup::setupPermissions",
+      "WordPress\\Setup::setupDropins"
+    ],
+    "test": [
+      "@lint",
+      "@test:unit"
+    ],
+    "lint": "phpcs",
+    "lint:fix": "phpcbf",
+    "test:unit": "phpunit",
+    "test:integration": "phpunit --testsuite integration",
+    "provision": [
+      "@provision:dev",
+      "@setup:permissions"
+    ],
+    "provision:dev": [
+      "bash bin/provision.sh development"
+    ],
+    "provision:prod": [
+      "bash bin/provision.sh production"
+    ],
+    "setup:permissions": [
+      "WordPress\\Setup::setupPermissions"
+    ],
+    "cache:clear": [
+      "WordPress\\Cache::clear"
+    ],
+    "logs:rotate": [
+      "WordPress\\Logs::rotate"
+    ]
+  },
+  "scripts-descriptions": {
+    "test": "Run all tests and code analysis",
+    "lint": "Check coding standards",
+    "lint:fix": "Fix coding standards automatically",
+    "provision": "Run full provisioning for development",
+    "provision:dev": "Run development environment provisioning",
+    "provision:prod": "Run production environment provisioning",
+    "cache:clear": "Clear all caches",
+    "logs:rotate": "Rotate and compress old logs"
+  }
 }

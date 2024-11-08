@@ -152,6 +152,6 @@ verify_optional || true  # Continuar aunque falle
 trap 'handle_error "Se produjo un error no manejado" $? $LINENO' ERR
 
 # Exportar funciones
-export -f handle_error
-export -f silent_error
-export -f retry_command
+#export -f handle_error
+#export -f silent_error
+#export -f retry_command
