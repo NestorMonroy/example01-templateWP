@@ -292,6 +292,166 @@ get_load_average() {
     cut -d ' ' -f1 /proc/loadavg
 }
 
+# Función para verificar sistema init
+# Uso: system_check_init
+# Retorna:
+#   0 - Si systemd es el init system
+#   1 - Si hay otro init system
+#   2 - Si no se puede determinar
+# Ejemplo:
+#   if system_check_init; then
+#       echo "systemd es el init system"
+#   fi
+system_check_init() {
+    log_info "Verificando sistema init..."
+
+    # Verificar proceso PID 1
+    local init_process
+    init_process=$(ps --no-headers -o comm 1)
+    if [ -z "$init_process" ]; then
+        log_error "No se pudo determinar el sistema init"
+        return 2
+    }
+
+    # Verificar si es systemd
+    if [ "$init_process" = "systemd" ]; then
+        # Obtener versión de systemd
+        local systemd_version
+        systemd_version=$(systemctl --version | head -n1 | awk '{print $2}')
+        log_success "systemd detectado (versión $systemd_version)"
+        return 0
+    else
+        log_warning "Sistema init detectado: $init_process"
+        return 1
+    fi
+}
+
+# Función para obtener archivo de unidad systemd
+# Uso: system_get_unit_file <nombre_unidad>
+# Retorna: Ruta al archivo de unidad o error si no existe
+# Ejemplo:
+#   unit_file=$(system_get_unit_file "nginx.service")
+#   if [ $? -eq 0 ]; then
+#       echo "Archivo de unidad: $unit_file"
+#   fi
+system_get_unit_file() {
+    local unit_name="$1"
+
+    log_info "Buscando archivo de unidad para $unit_name..."
+
+    # Verificar que se proporcionó un nombre de unidad
+    if [ -z "$unit_name" ]; then
+        log_error "Nombre de unidad no especificado"
+        return 1
+    }
+
+    # Asegurar que tiene extensión .service
+    if [[ ! "$unit_name" =~ \.service$ ]]; then
+        unit_name="${unit_name}.service"
+    fi
+
+    # Buscar el archivo de unidad
+    local unit_file
+    unit_file=$(systemctl show -p FragmentPath --value "$unit_name" 2>/dev/null)
+
+    if [ -z "$unit_file" ] || [ ! -f "$unit_file" ]; then
+        log_error "Archivo de unidad no encontrado para $unit_name"
+        return 1
+    fi
+
+    echo "$unit_file"
+    log_success "Archivo de unidad encontrado: $unit_file"
+    return 0
+}
+
+# Función para verificación completa de systemd
+# Uso: system_verify_systemd
+# Retorna:
+#   0 - systemd está funcionando correctamente
+#   1 - Hay problemas con systemd
+# Ejemplo:
+#   if system_verify_systemd; then
+#       echo "systemd está en buen estado"
+#   fi
+system_verify_systemd() {
+    log_info "Realizando verificación completa de systemd..."
+    local issues_found=0
+
+    # 1. Verificar que systemd es el init system
+    if ! system_check_init; then
+        log_error "systemd no es el sistema init"
+        return 1
+    fi
+
+    # 2. Verificar estado del sistema
+    local system_state
+    system_state=$(systemctl is-system-running)
+    log_info "Estado del sistema: $system_state"
+
+    case "$system_state" in
+        "running")
+            log_success "Sistema funcionando normalmente"
+            ;;
+        "degraded")
+            log_warning "Sistema en estado degradado"
+            ((issues_found++))
+            ;;
+        "maintenance")
+            log_error "Sistema en modo mantenimiento"
+            ((issues_found++))
+            ;;
+        *)
+            log_error "Estado del sistema desconocido: $system_state"
+            ((issues_found++))
+            ;;
+    esac
+
+    # 3. Verificar el journal
+    if ! journalctl --verify >/dev/null 2>&1; then
+        log_warning "Se encontraron problemas en el journal"
+        ((issues_found++))
+    fi
+
+    # 4. Verificar servicios esenciales de systemd
+    local essential_services=(
+        "systemd-journald.service"
+        "systemd-logind.service"
+        "systemd-udevd.service"
+    )
+
+    for service in "${essential_services[@]}"; do
+        if ! systemctl is-active --quiet "$service"; then
+            log_warning "Servicio esencial inactivo: $service"
+            ((issues_found++))
+        fi
+    done
+
+    # 5. Verificar tiempo de arranque
+    local boot_time
+    boot_time=$(systemd-analyze time 2>/dev/null)
+    if [ $? -eq 0 ]; then
+        log_info "Tiempo de arranque: $boot_time"
+    else
+        log_warning "No se pudo obtener el tiempo de arranque"
+        ((issues_found++))
+    fi
+
+    # 6. Verificar espacio del journal
+    local journal_size
+    journal_size=$(journalctl --disk-usage | cut -d' ' -f7-)
+    log_info "Tamaño del journal: $journal_size"
+
+    # Resultado final
+    if [ $issues_found -eq 0 ]; then
+        log_success "Verificación de systemd completada sin problemas"
+        return 0
+    else
+        log_warning "Se encontraron $issues_found problemas en systemd"
+        return 1
+    fi
+}
+
+
 
 # Ejemplo de uso completo del script
 : '
@@ -339,3 +499,6 @@ check_root
 #export -f get_cpu_speed
 #export -f check_cpu_throttling
 #export -f get_load_average
+#export -f system_check_init
+#export -f system_get_unit_file
+#export -f system_verify_systemd

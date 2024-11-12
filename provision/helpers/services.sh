@@ -292,6 +292,177 @@ check_service_dependencies() {
 
     return 0
 }
+# Función para obtener estado detallado de un servicio
+# Uso: service_get_status <nombre_servicio>
+# Ejemplo:
+#   status=$(service_get_status "nginx")
+#   echo "Estado detallado: $status"
+service_get_status() {
+    local service_name="$1"
+    local status
+
+    log_info "Obteniendo estado detallado de $service_name..."
+
+    # Verificar que el servicio existe
+    if ! service_exists "$service_name"; then
+        log_error "Servicio $service_name no encontrado"
+        return 1
+    fi
+
+    # Obtener estado detallado usando systemctl
+    status=$(systemctl status "$service_name" --no-pager)
+    if [ $? -ne 0 ]; then
+        log_error "Error obteniendo estado de $service_name"
+        return 1
+    fi
+
+    echo "$status"
+    return 0
+}
+
+# Función para obtener unidades fallidas de systemd
+# Uso: service_get_failed_units [mostrar_detalles]
+# Ejemplo:
+#   failed_units=$(service_get_failed_units)
+#   echo "Unidades fallidas: $failed_units"
+service_get_failed_units() {
+    local show_details="${1:-false}"
+    local failed_units
+
+    log_info "Verificando unidades fallidas..."
+
+    if [ "$show_details" = true ]; then
+        # Obtener lista detallada de unidades fallidas
+        failed_units=$(systemctl --failed --no-pager)
+    else
+        # Obtener solo nombres de unidades fallidas
+        failed_units=$(systemctl --failed --no-pager --plain --no-legend | awk '{print $1}')
+    fi
+
+    # Verificar si hay unidades fallidas
+    if [ -n "$failed_units" ]; then
+        log_warning "Se encontraron unidades fallidas"
+        echo "$failed_units"
+        return 1
+    fi
+
+    log_success "No se encontraron unidades fallidas"
+    return 0
+}
+
+# Función para verificar si systemd está funcionando correctamente
+# Uso: service_is_system_running
+# Ejemplo:
+#   if service_is_system_running; then
+#       echo "systemd está funcionando correctamente"
+#   fi
+service_is_system_running() {
+    local system_state
+
+    log_info "Verificando estado de systemd..."
+
+    # Verificar que systemd es el init system
+    if [ "$(ps --no-headers -o comm 1)" != "systemd" ]; then
+        log_error "systemd no es el sistema init"
+        return 1
+    fi
+
+    # Obtener estado actual del sistema
+    system_state=$(systemctl is-system-running)
+
+    case "$system_state" in
+        "running")
+            log_success "systemd está funcionando correctamente"
+            return 0
+            ;;
+        "degraded")
+            log_warning "systemd está en estado degradado"
+            return 1
+            ;;
+        "maintenance")
+            log_error "systemd está en modo mantenimiento"
+            return 2
+            ;;
+        *)
+            log_error "systemd está en estado: $system_state"
+            return 3
+            ;;
+    esac
+}
+
+# Función para obtener carga de un servicio específico
+# Uso: service_get_load <nombre_servicio>
+# Ejemplo:
+#   load=$(service_get_load "nginx")
+#   echo "Carga del servicio: $load"
+service_get_load() {
+    local service_name="$1"
+    local service_load
+
+    log_info "Obteniendo carga del servicio $service_name..."
+
+    # Verificar que el servicio existe y está corriendo
+    if ! service_is_running "$service_name"; then
+        log_error "Servicio $service_name no está en ejecución"
+        return 1
+    fi
+
+    # Obtener PID del servicio
+    local pid
+    pid=$(systemctl show --property MainPID --value "$service_name")
+
+    if [ -z "$pid" ] || [ "$pid" = "0" ]; then
+        log_error "No se pudo obtener PID del servicio $service_name"
+        return 1
+    fi
+
+    # Obtener estadísticas del servicio
+    service_load=$(ps -p "$pid" -o %cpu,%mem --no-headers)
+    if [ $? -ne 0 ]; then
+        log_error "Error obteniendo estadísticas del servicio $service_name"
+        return 1
+    }
+
+    echo "$service_load"
+    return 0
+}
+
+# Función para verificar logs de un servicio
+# Uso: service_check_logs <nombre_servicio> [líneas] [nivel]
+# Ejemplo:
+#   service_check_logs "nginx" 100 "err"
+#   service_check_logs "mysql" 50 "warning"
+service_check_logs() {
+    local service_name="$1"
+    local lines="${2:-50}"
+    local level="${3:-err}"
+    local logs
+
+    log_info "Verificando logs de $service_name..."
+
+    # Verificar que el servicio existe
+    if ! service_exists "$service_name"; then
+        log_error "Servicio $service_name no encontrado"
+        return 1
+    fi
+
+    # Obtener logs del servicio usando journalctl
+    logs=$(journalctl -u "$service_name" -n "$lines" -p "$level" --no-pager)
+    if [ $? -ne 0 ]; then
+        log_error "Error obteniendo logs de $service_name"
+        return 1
+    }
+
+    # Si hay logs, mostrarlos
+    if [ -n "$logs" ]; then
+        log_warning "Se encontraron mensajes de nivel $level en $service_name:"
+        echo "$logs"
+        return 1
+    fi
+
+    log_success "No se encontraron mensajes de nivel $level en $service_name"
+    return 0
+}
 
 # Ejemplo de uso completo del script
 : '
@@ -339,3 +510,9 @@ echo "Puerto disponible: $puerto"
 #export -f find_next_available_port
 #export -f wait_for_port
 #export -f check_service_dependencies
+# Exportar las nuevas funciones
+#export -f service_get_status
+#export -f service_get_failed_units
+#export -f service_is_system_running
+#export -f service_get_load
+#export -f service_check_logs
