@@ -63,14 +63,14 @@ main_provision() {
 
       # Inicializar entorno de provisión
       init_provision_env || {
-          handle_error "Error al inicializar el entorno de provisión"
+          error_handle "Error al inicializar el entorno de provisión"
           exit 1
       }
 
       # 1. Ejecutar pre-hooks
       log_info "Ejecutando pre-hooks..."
       run_pre_hooks || {
-          handle_error "Error en pre-hooks"
+          error_handle "Error en pre-hooks"
           exit 1
       }
 
@@ -80,28 +80,28 @@ main_provision() {
       # 2.1 Configurar PHP
       log_info "Configurando PHP..."
       source "${PROVISION_DIR}/scripts/setup-php.sh" || {
-          handle_error "Error en configuración de PHP"
+          error_handle "Error en configuración de PHP"
           exit 1
       }
 
       # 2.2 Configurar MySQL
       log_info "Configurando MySQL..."
       source "${PROVISION_DIR}/scripts/setup-mysql.sh" || {
-          handle_error "Error en configuración de MySQL"
+          error_handle "Error en configuración de MySQL"
           exit 1
       }
 
       # 2.3 Instalar y configurar WordPress
       log_info "Instalando WordPress..."
       source "${PROVISION_DIR}/scripts/setup-wordpress.sh" || {
-          handle_error "Error en instalación de WordPress"
+          error_handle "Error en instalación de WordPress"
           exit 1
       }
 
       # 3. Ejecutar post-hooks
       log_info "Ejecutando post-hooks..."
       run_post_hooks || {
-          handle_error "Error en post-hooks"
+          error_handle "Error en post-hooks"
           exit 1
       }
 
@@ -112,20 +112,20 @@ main_provision() {
       local required_services=(php-fpm mysql nginx)
       for service in "${required_services[@]}"; do
           if ! systemctl is-active --quiet "$service"; then
-              handle_error "El servicio $service no está activo"
+              error_handle "El servicio $service no está activo"
               exit 1
           fi
       }
 
       # Verificar acceso a WordPress
       if ! curl -sSf "http://localhost" > /dev/null; then
-          handle_error "No se puede acceder a WordPress"
+          error_handle "No se puede acceder a WordPress"
           exit 1
       }
 
       # Verificar permisos finales
       verify_wordpress_permissions || {
-          handle_error "Error en permisos finales"
+          error_handle "Error en permisos finales"
           exit 1
       }
 

@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# 02-backup-existing.sh
-#!/bin/bash
 
 # hooks/pre/03-backup-existing.sh
 # -------------------------------

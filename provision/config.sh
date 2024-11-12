@@ -32,7 +32,40 @@ export MIN_CPU_CORES=1
 export REQUIRED_PORTS=(80 443 3306)
 export REQUIRED_PACKAGES=(php mysql-server nginx)
 
+# Actualizaciones necesarias para el sistema de backup
+# Rutas de backup
+export BACKUP_BASE_DIR="${PROJECT_DIR}/backups"
+export BACKUP_TEMP_DIR="${TEMP_DIR}/backup"
+export BACKUP_RETENTION_DAYS=30
+export MAX_BACKUP_SIZE_MB=5120  # 5GB máximo por backup
+export MIN_BACKUP_SPACE_MB=6144 # Requiere 6GB libres para backup
 
+# Variables de control de backup
+export BACKUP_COMPRESSION=true
+export BACKUP_VERIFY=true
+export BACKUP_INCLUDE_PLUGINS=true
+export BACKUP_INCLUDE_THEMES=true
+export BACKUP_INCLUDE_UPLOADS=true
+export BACKUP_INCLUDE_DB=true
+
+# Patrones de exclusión para backup (archivos que no se respaldarán)
+export BACKUP_EXCLUDE_PATTERNS=(
+    "*.log"
+    "*.tmp"
+    "*.cache"
+    "*/cache/*"
+    "*/logs/*"
+    "*/backup*/*"
+    "*/node_modules/*"
+    "*/vendor/*"
+)
+
+# Configuraciones específicas para backup de base de datos
+export DB_BACKUP_SINGLE_TRANSACTION=true
+export DB_BACKUP_COMPRESS=true
+export DB_BACKUP_ROUTINES=true
+export DB_BACKUP_EVENTS=true
+export DB_BACKUP_TRIGGERS=true
 
 # Función para inicializar el entorno
 init_provision_env() {

@@ -257,6 +257,152 @@ check_ssl_certificate() {
     fi
 }
 
+# Agregar después de las funciones existentes en network.sh
+
+# Verificar si un puerto está en el rango privilegiado
+# Uso: is_privileged_port <puerto>
+# Retorna:
+#   0 - Es puerto privilegiado
+#   1 - No es puerto privilegiado
+is_privileged_port() {
+    local port="$1"
+    [ "$port" -lt 1024 ]
+}
+
+# Verificar si se puede hacer bind a un puerto
+# Uso: can_bind_to_port <puerto>
+# Retorna:
+#   0 - Se puede hacer bind
+#   1 - No se puede hacer bind
+can_bind_to_port() {
+    local port="$1"
+    local user_id="$(id -u)"
+
+    if is_privileged_port "$port"; then
+        [ "$user_id" -eq 0 ]
+        return $?
+    fi
+
+    return 0
+}
+
+# Verificar disponibilidad y estado de un puerto específico
+# Uso: verify_port <puerto> [descripción] [protocolo] [timeout]
+# Retorna:
+#   0 - Puerto disponible
+#   1 - Puerto no disponible
+#   2 - Error en verificación
+# Verificar disponibilidad de un puerto usando solo herramientas base
+verify_port() {
+    local port="$1"
+    local description="${2:-Puerto $port}"
+    local protocol="${3:-tcp}"
+    local timeout="${4:-5}"
+
+    log_info "Verificando $description (puerto $port/$protocol)..."
+
+    # Validar el puerto
+    if ! [[ "$port" =~ ^[0-9]+$ ]] || [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
+        log_error "Puerto inválido: $port"
+        return 2
+    fi
+
+    # Verificar si el puerto está en uso (usando netstat que es más común)
+    if netstat -tuln | grep -q ":${port}[[:space:]]"; then
+        # El puerto está en uso
+        return 1
+    fi
+
+    # Intento alternativo de verificación usando diferentes herramientas
+    # en orden de preferencia
+    if command -v nc >/dev/null; then
+        # Usando netcat
+        if nc -z localhost "$port" 2>/dev/null; then
+            return 1
+        fi
+    elif command -v timeout >/dev/null; then
+        # Usando bash y timeout
+        if timeout "$timeout" bash -c "echo >/dev/tcp/localhost/$port" 2>/dev/null; then
+            return 1
+        fi
+    else
+        # Usando solo bash (con timeout manual mediante subshell y kill)
+        local pid
+        (bash -c "echo >/dev/tcp/localhost/$port") 2>/dev/null & pid=$!
+        sleep "$timeout"
+        kill "$pid" 2>/dev/null
+        wait "$pid" 2>/dev/null
+        if [ $? -eq 0 ]; then
+            return 1
+        fi
+    fi
+
+    # Verificación adicional para puertos privilegiados
+    if [ "$port" -lt 1024 ] && [ "$(id -u)" != "0" ]; then
+        log_warning "Puerto privilegiado ($port < 1024) requiere permisos root"
+        return 2
+    fi
+
+    return 0
+}
+
+
+# Obtener información detallada de un puerto
+# Uso: get_port_info <puerto> [protocolo]
+# Salida: Información en formato key=value
+# Obtener información detallada de un puerto sin dependencias externas
+get_port_info() {
+    local port="$1"
+    local protocol="${2:-tcp}"
+    local info=""
+
+    # Intentar obtener información usando diferentes herramientas
+    # en orden de preferencia
+    if command -v lsof >/dev/null; then
+        # Usando lsof si está disponible
+        local process_info
+        process_info=$(lsof -i :"$port" -P -n 2>/dev/null)
+        if [ -n "$process_info" ]; then
+            info+="PROCESS=$(echo "$process_info" | tail -n 1 | awk '{print $1}')\n"
+            info+="PID=$(echo "$process_info" | tail -n 1 | awk '{print $2}')\n"
+            info+="USER=$(echo "$process_info" | tail -n 1 | awk '{print $3}')\n"
+        fi
+    else
+        # Usando netstat como alternativa
+        local netstat_info
+        netstat_info=$(netstat -tulnp 2>/dev/null | grep ":${port}[[:space:]]")
+        if [ -n "$netstat_info" ]; then
+            info+="PROCESS=$(echo "$netstat_info" | awk '{print $NF}')\n"
+            info+="STATE=$(echo "$netstat_info" | awk '{print $6}')\n"
+        fi
+    fi
+
+    # Información adicional basada en sistema
+    info+="PRIVILEGED=$([ "$port" -lt 1024 ] && echo "yes" || echo "no")\n"
+    info+="PROTOCOL=$protocol\n"
+    info+="PORT=$port\n"
+
+    echo -e "$info"
+}
+
+# Verificar rápidamente si un puerto está en uso
+is_port_active() {
+    local port="$1"
+    local protocol="${2:-tcp}"
+
+    # Primero intentar con netstat (más común)
+    if netstat -tuln | grep -q ":${port}[[:space:]]"; then
+        return 0
+    fi
+
+    # Si netstat no muestra nada, intentar con una conexión rápida
+    if ! (echo >/dev/tcp/localhost/"$port") 2>/dev/null; then
+        return 1
+    fi
+
+    return 0
+}
+
 # Ejemplo de uso completo del script
 : '
 # Verificar conexión básica

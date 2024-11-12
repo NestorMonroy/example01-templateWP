@@ -7,6 +7,8 @@
 # - Salida a archivo
 # - Formateo con tags
 # - Timestamps
+# - Progreso de operaciones
+# - Logs específicos para backup
 #
 # Ejemplo de uso básico:
 #   source ./logging.sh
@@ -23,10 +25,10 @@ if [ -z "$CRESET" ]; then
     source "$(dirname "${BASH_SOURCE[0]}")/colors.sh"
 fi
 
-# Función para obtener timestamp actual
-# Uso: timestamp=$(get_timestamp)
-get_timestamp() {
-    date "+%Y-%m-%d %H:%M:%S"
+# Función para obtener timestamp actual con milisegundos
+# Uso: timestamp=$(get_log_timestamp)
+get_log_timestamp() {
+    date "+%Y-%m-%d %H:%M:%S.%3N"
 }
 
 # Niveles de log disponibles y sus valores numéricos
@@ -38,6 +40,7 @@ declare -A LOG_LEVELS=(
     ["WARNING"]=3    # Advertencias
     ["ERROR"]=4      # Errores
     ["CRITICAL"]=5   # Errores críticos
+    ["BACKUP"]=6     # Logs específicos de backup
 )
 
 # Colores asociados a cada nivel de log
@@ -48,6 +51,7 @@ declare -A LOG_COLORS=(
     ["WARNING"]="${WARNING_COLOR}"
     ["ERROR"]="${ERROR_COLOR}"
     ["CRITICAL"]="${ERROR_COLOR}${BOLD}"
+    ["BACKUP"]="${CYAN}${BOLD}"
 )
 
 # Nivel de log actual
@@ -56,8 +60,100 @@ CURRENT_LOG_LEVEL=${CURRENT_LOG_LEVEL:-1} # Default a INFO
 # Archivo de log actual
 CURRENT_LOG_FILE=""
 
+# Variables para control de progreso
+LOG_PROGRESS_CHAR="="
+LOG_PROGRESS_WIDTH=50
+LOG_LAST_PROGRESS_LENGTH=0
+
+# Función para logging específico de backup
+# Uso: log_backup <mensaje>
+# Ejemplo: log_backup "Iniciando backup de archivos"
+log_backup() {
+    local message="$1"
+    log_base "BACKUP" "$message"
+}
+
+# Función para mostrar barra de progreso en log
+# Uso: log_show_progress <actual> <total> [mensaje]
+# Ejemplo: log_show_progress 45 100 "Copiando archivos"
+log_show_progress() {
+    local current="$1"
+    local total="$2"
+    local message="${3:-}"
+    local percentage=$((current * 100 / total))
+    local progress=$((percentage * LOG_PROGRESS_WIDTH / 100))
+
+    # Crear barra de progreso
+    local bar=""
+    for ((i=0; i<LOG_PROGRESS_WIDTH; i++)); do
+        if [ $i -lt $progress ]; then
+            bar+="$LOG_PROGRESS_CHAR"
+        else
+            bar+=" "
+        fi
+    done
+
+    # Construir línea de progreso
+    local progress_line="[${bar}] ${percentage}%"
+    if [ -n "$message" ]; then
+        progress_line+=" $message"
+    fi
+
+    # Calcular longitud para limpiar línea anterior
+    local line_length=${#progress_line}
+    if [ $line_length -lt $LOG_LAST_PROGRESS_LENGTH ]; then
+        # Limpiar caracteres restantes de la línea anterior
+        printf "%${LOG_LAST_PROGRESS_LENGTH}s\r" " "
+    fi
+    LOG_LAST_PROGRESS_LENGTH=$line_length
+
+    # Mostrar progreso
+    printf "\r${progress_line}"
+
+    # Si llegamos al 100%, agregar nueva línea
+    if [ $percentage -eq 100 ]; then
+        echo
+        LOG_LAST_PROGRESS_LENGTH=0
+    fi
+}
+
+
+# Función para logging con progreso
+# Uso: log_progress <actual> <total> <mensaje>
+# Ejemplo: log_progress 50 100 "Procesando archivos"
+log_progress() {
+    local current="$1"
+    local total="$2"
+    local message="$3"
+    local percentage=$((current * 100 / total))
+
+    # Mostrar barra de progreso en stdout
+    show_progress "$current" "$total" "$message"
+
+    # Registrar en archivo de log si está configurado
+    if [ -n "$CURRENT_LOG_FILE" ]; then
+        echo "[$(get_log_timestamp)] PROGRESS: ($percentage%) $message" >> "$CURRENT_LOG_FILE"
+    fi
+}
+
+# Función para iniciar logging de operación larga
+# Uso: log_start_operation <mensaje>
+# Ejemplo: log_start_operation "Copiando archivos grandes"
+log_start_operation() {
+    local message="$1"
+    echo -n "[$(get_log_timestamp)] $message... "
+}
+
+# Función para finalizar logging de operación larga
+# Uso: log_end_operation <estado>
+# Ejemplo: log_end_operation "OK"
+log_end_operation() {
+    local status="$1"
+    echo "$status"
+}
+
 # Función para formatear la salida con tags
-# Uso: format_output "<b>texto</b> <error>error</error>"
+# Uso: log_format_output "<b>texto</b> <error>error</error>"
 # Tags disponibles:
 #   <b> - Negrita
 #   <i> - Itálica
@@ -71,7 +167,9 @@ CURRENT_LOG_FILE=""
 #   <debug> - Color debug
 #   <url> - Color URL
 #   </> - Reset
-format_output() {
+log_format_output() {
+    local MSG="${1}</>"
+
     declare -A TAGS=(
         ['<b>']="${BOLD}"
         ['</b>']="${UNBOLD}"
@@ -96,9 +194,10 @@ format_output() {
         ['<url>']="${URL_COLOR}"
         ['</url>']="${CRESET}"
         ['</>']="${CRESET}"
+        ['<progress>']="${CYAN}"
+        ['</progress>']="${CRESET}"
     )
 
-    local MSG="${1}</>"
     for TAG in "${!TAGS[@]}"; do
         local VAL="${TAGS[$TAG]}"
         MSG="${MSG//"${TAG}"/"${VAL}"}"
@@ -123,7 +222,7 @@ log_base() {
     # Verificar nivel de log
     if [ "${LOG_LEVELS[$level]}" -ge "$CURRENT_LOG_LEVEL" ]; then
         local timestamp
-        timestamp=$(get_timestamp)
+        timestamp=$(get_log_timestamp)
         local formatted_message
 
         # Formatear mensaje según el nivel
@@ -146,10 +245,13 @@ log_base() {
             "CRITICAL")
                 formatted_message="<error><b>${message}</b></error>"
                 ;;
+           "BACKUP")
+                formatted_message="<notice>[BACKUP] ${message}</notice>"
+                ;;
         esac
 
         # Formatear mensaje final
-        formatted_message=$(format_output "${formatted_message}")
+        formatted_message=$(log_format_output "${formatted_message}")
 
         # Imprimir a stdout
         echo -e "[${timestamp}] ${level}: ${formatted_message}"
@@ -300,7 +402,7 @@ if ! log_command "apt-get update" "Actualizando sistema"; then
 fi
 
 # Usar formato
-log_info $(format_output "<b>Instalación completada</b>")
+log_info $(log_format_output "<b>Instalación completada</b>")
 
 # Separadores
 log_separator
@@ -319,8 +421,8 @@ if [ -z "$LOG_INITIALIZED" ]; then
 fi
 
 # Exportar funciones
-#export -f get_timestamp
-#export -f format_output
+#export -f get_log_timestamp
+#export -f log_format_output
 #export -f log_base
 #export -f log_debug
 #export -f log_info
@@ -333,3 +435,8 @@ fi
 #export -f log_separator
 #export -f log_header
 #export -f log_command
+#export -f log_backup
+#export -f log_progress
+#export -f show_progress
+#export -f start_long_operation
+#export -f end_long_operation
