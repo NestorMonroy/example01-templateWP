@@ -464,6 +464,138 @@ service_check_logs() {
     return 0
 }
 
+# Verificar socket unix
+# Uso: check_socket <ruta_socket> [timeout]
+# Ejemplo:
+#   check_socket "/run/php/php8.1-fpm.sock" 5
+#   check_socket "/var/run/mysql/mysql.sock"
+check_socket() {
+    local socket_path="$1"
+    local timeout="${2:-5}"
+    local counter=0
+
+    log_info "Verificando socket: $socket_path"
+
+    # Verificar existencia del socket
+    if [ ! -S "$socket_path" ]; then
+        log_error "Socket no encontrado: $socket_path"
+        return 1
+    }
+
+    # Verificar permisos
+    if [ ! -r "$socket_path" ]; then
+        log_error "Socket sin permisos de lectura: $socket_path"
+        return 1
+    }
+
+    # Verificar conectividad
+    while [ $counter -lt $timeout ]; do
+        if nc -U -z "$socket_path" 2>/dev/null; then
+            log_success "Socket operativo: $socket_path"
+            return 0
+        fi
+        ((counter++))
+        sleep 1
+    done
+
+    log_error "Socket no responde después de $timeout segundos: $socket_path"
+    return 1
+}
+
+# Verificar configuración de servicio
+# Uso: verify_service_config <archivo_config> <patrón_búsqueda>
+# Ejemplo:
+#   verify_service_config "/etc/nginx/nginx.conf" "worker_processes\s+[0-9]+"
+#   verify_service_config "/etc/php/8.1/fpm/php.ini" "^memory_limit\s*=\s*[0-9]+M"
+verify_service_config() {
+    local config_file="$1"
+    local search_pattern="$2"
+    local backup_dir="${PROVISION_DIR}/backups/configs"
+
+    log_info "Verificando configuración en: $config_file"
+
+    # Verificar archivo
+    if [ ! -f "$config_file" ]; then
+        log_error "Archivo de configuración no encontrado: $config_file"
+        return 1
+    }
+
+    # Crear backup si no existe
+    ensure_directory "$backup_dir"
+    if [ ! -f "${backup_dir}/$(basename "$config_file").orig" ]; then
+        log_info "Creando backup de configuración"
+        safe_copy "$config_file" "${backup_dir}/$(basename "$config_file").orig"
+    fi
+
+    # Verificar patrón
+    if grep -qE "$search_pattern" "$config_file"; then
+        log_success "Configuración verificada en $config_file"
+        return 0
+    else
+        log_error "Patrón no encontrado en $config_file: $search_pattern"
+        return 1
+    fi
+}
+
+# Verificar estado completo de servicio
+# Uso: verify_service_state <servicio> [required_state]
+# Ejemplo:
+#   verify_service_state "nginx" "running"
+#   verify_service_state "mysql"
+verify_service_state() {
+    local service="$1"
+    local required_state="${2:-running}"
+    local verification_errors=0
+
+    log_info "Verificando estado de servicio: $service"
+
+    # Verificar existencia
+    if ! service_exists "$service"; then
+        log_error "Servicio no existe: $service"
+        return 1
+    }
+
+    # Verificar estado actual
+    case "$required_state" in
+        "running")
+            if ! service_is_running "$service"; then
+                log_error "Servicio no está ejecutándose: $service"
+                ((verification_errors++))
+            fi
+            ;;
+        "stopped")
+            if service_is_running "$service"; then
+                log_error "Servicio debería estar detenido: $service"
+                ((verification_errors++))
+            fi
+            ;;
+        *)
+            log_error "Estado requerido no válido: $required_state"
+            return 1
+            ;;
+    esac
+
+    # Verificar inicio automático
+    if [ "$required_state" = "running" ] && ! service_is_enabled "$service"; then
+        log_warning "Servicio no está habilitado para inicio automático: $service"
+        ((verification_errors++))
+    fi
+
+    # Verificar dependencias
+    if ! check_service_dependencies "$service"; then
+        log_error "Problemas con dependencias del servicio: $service"
+        ((verification_errors++))
+    fi
+
+    if [ $verification_errors -eq 0 ]; then
+        log_success "Servicio $service verificado correctamente"
+        return 0
+    else
+        log_error "Servicio $service tiene $verification_errors errores"
+        return 1
+    fi
+}
+
 # Ejemplo de uso completo del script
 : '
 #!/bin/bash

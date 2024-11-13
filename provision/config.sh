@@ -26,9 +26,7 @@ export IS_INITIALIZED=false
 # Variables de wordpress
 export WORDPRESS_PATH="/var/www/wordpress"
 export BACKUP_PATH="/var/backups/wordpress"
-export MIN_MEMORY_MB=512
 export MIN_DISK_GB=5
-export MIN_CPU_CORES=1
 export REQUIRED_PORTS=(80 443 3306)
 export REQUIRED_PACKAGES=(php mysql-server nginx)
 
@@ -66,6 +64,181 @@ export DB_BACKUP_COMPRESS=true
 export DB_BACKUP_ROUTINES=true
 export DB_BACKUP_EVENTS=true
 export DB_BACKUP_TRIGGERS=true
+
+# Configuraciones de repositorios
+# PPAs requeridos
+export REQUIRED_PPAS=(
+    "ppa:ondrej/php"      # Para PHP
+    "ppa:ondrej/nginx"    # Para Nginx actualizado
+)
+
+# Repositorios externos
+declare -A EXTERNAL_REPOS=(
+    ["mysql"]="deb [signed-by=/etc/apt/trusted.gpg.d/mysql.gpg] http://repo.mysql.com/apt/ubuntu/ $(lsb_release -sc) mysql-${MYSQL_VERSION}"
+)
+
+# URLs de llaves GPG
+declare -A GPG_KEYS=(
+    ["mysql"]="https://dev.mysql.com/doc/refman/${MYSQL_VERSION}/en/checking-gpg-signature.html"
+)
+
+# Configuración de sources.list
+export SOURCES_BACKUP_DIR="${PROJECT_DIR}/backups/sources"
+export SOURCES_LIST="/etc/apt/sources.list"
+
+# Definiciones de paquetes requeridos
+# Paquetes base del sistema
+export SYSTEM_PACKAGES=(
+    "apt-transport-https"
+    "ca-certificates"
+    "software-properties-common"
+    "curl"
+    "wget"
+    "git"
+    "unzip"
+    "tar"
+    "gnupg"
+)
+
+# Paquetes para servidor web y PHP
+export WEB_PACKAGES=(
+    "nginx"
+    "php${PHP_VERSION}-fpm"
+    "php${PHP_VERSION}-cli"
+    "php${PHP_VERSION}-common"
+    "php${PHP_VERSION}-mysql"
+    "php${PHP_VERSION}-xml"
+    "php${PHP_VERSION}-curl"
+    "php${PHP_VERSION}-gd"
+    "php${PHP_VERSION}-mbstring"
+    "php${PHP_VERSION}-zip"
+    "php${PHP_VERSION}-json"
+)
+
+# Paquetes para base de datos
+export DB_PACKAGES=(
+    "mysql-server"
+    "mysql-client"
+)
+
+# Versiones requeridas
+export PACKAGE_VERSIONS=(
+    "nginx:latest"
+    "php:${PHP_VERSION}"
+    "mysql:${MYSQL_VERSION}"
+)
+
+# Directorios para logs y temporales de paquetes
+export PACKAGES_LOG_DIR="${LOGS_DIR}/packages"
+export PACKAGES_TEMP_DIR="${TEMP_DIR}/packages"
+
+# Opciones de instalación
+export PACKAGES_VERIFY_AFTER_INSTALL=true
+export PACKAGES_AUTO_REMOVE=true
+
+# Configuraciones de servicios
+declare -A PHP_CONFIGURATIONS=(
+    ["memory_limit"]="256M"
+    ["max_execution_time"]="300"
+    ["post_max_size"]="64M"
+    ["upload_max_filesize"]="64M"
+    ["max_input_vars"]="3000"
+    ["date.timezone"]="UTC"
+)
+
+declare -A MYSQL_CONFIGURATIONS=(
+    ["max_allowed_packet"]="64M"
+    ["innodb_buffer_pool_size"]="256M"
+    ["key_buffer_size"]="128M"
+    ["max_connections"]="150"
+)
+
+declare -A NGINX_CONFIGURATIONS=(
+    ["worker_connections"]="2048"
+    ["client_max_body_size"]="64M"
+    ["keepalive_timeout"]="65"
+    ["fastcgi_read_timeout"]="300"
+)
+
+# Lista de servicios a gestionar
+export MANAGED_SERVICES=(
+    "php${PHP_VERSION}-fpm"
+    "mysql"
+    "nginx"
+)
+
+# Rutas de sockets y puertos para verificación
+declare -A SERVICE_SOCKETS=(
+    ["php-fpm"]="/run/php/php${PHP_VERSION}-fpm.sock"
+    ["mysql"]="/var/run/mysqld/mysqld.sock"
+)
+
+declare -A SERVICE_PORTS=(
+    ["nginx"]="80"
+    ["nginx-ssl"]="443"
+    ["mysql"]="3306"
+    ["php-fpm"]="9000"
+)
+
+# Patrones de configuración por servicio
+declare -A SERVICE_CONFIG_PATTERNS=(
+    # PHP
+    ["php_memory_limit"]="^memory_limit\s*=\s*${PHP_CONFIGURATIONS[memory_limit]}"
+    ["php_max_execution_time"]="^max_execution_time\s*=\s*${PHP_CONFIGURATIONS[max_execution_time]}"
+    ["php_post_max_size"]="^post_max_size\s*=\s*${PHP_CONFIGURATIONS[post_max_size]}"
+    ["php_upload_max_filesize"]="^upload_max_filesize\s*=\s*${PHP_CONFIGURATIONS[upload_max_filesize]}"
+
+    # MySQL
+    ["mysql_max_connections"]="^max_connections\s*=\s*${MYSQL_CONFIGURATIONS[max_connections]}"
+    ["mysql_key_buffer_size"]="^key_buffer_size\s*=\s*${MYSQL_CONFIGURATIONS[key_buffer_size]}"
+
+    # Nginx
+    ["nginx_worker_connections"]="worker_connections\s+${NGINX_CONFIGURATIONS[worker_connections]}"
+    ["nginx_client_max_body"]="client_max_body_size\s+${NGINX_CONFIGURATIONS[client_max_body_size]}"
+)
+
+# Archivos de configuración por servicio
+declare -A SERVICE_CONFIG_FILES=(
+    ["php"]="/etc/php/${PHP_VERSION}/fpm/php.ini"
+    ["php-fpm"]="/etc/php/${PHP_VERSION}/fpm/pool.d/www.conf"
+    ["mysql"]="/etc/mysql/mysql.conf.d/mysqld.cnf"
+    ["nginx"]="/etc/nginx/nginx.conf"
+)
+
+# Estados esperados de servicios
+declare -A SERVICE_STATES=(
+    ["php${PHP_VERSION}-fpm"]="running"
+    ["mysql"]="running"
+    ["nginx"]="running"
+)
+
+# Timeouts para verificaciones (en segundos)
+declare -A SERVICE_TIMEOUTS=(
+    ["socket"]=5
+    ["port"]=3
+    ["service"]=10
+)
+
+# Dependencias de servicios
+declare -A SERVICE_DEPENDENCIES=(
+    ["nginx"]="php${PHP_VERSION}-fpm"
+    ["php${PHP_VERSION}-fpm"]=""
+    ["mysql"]=""
+)
+
+# Directorios para backups de configuración
+export SERVICE_BACKUP_DIR="${PROJECT_DIR}/backups/services"
+export SERVICE_CONFIG_BACKUP_DIR="${SERVICE_BACKUP_DIR}/configs"
+
+# Variables para control de verificación
+export VERIFY_PORTS=true
+export VERIFY_SOCKETS=true
+export VERIFY_CONFIGS=true
+export VERIFY_DEPENDENCIES=true
+export VERIFY_AUTO_START=true
+
+# Número máximo de reintentos para verificaciones
+
 
 # Función para inicializar el entorno
 init_provision_env() {

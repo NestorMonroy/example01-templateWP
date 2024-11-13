@@ -396,6 +396,157 @@ verify_package_versions() {
     return $failed
 }
 
+# Función para instalar grupo de paquetes con logging
+# Uso: install_package_group <nombre_grupo> <paquetes...>
+# Ejemplo:
+#   install_package_group "php" "php8.1-cli" "php8.1-fpm" "php8.1-mysql"
+#   install_package_group "base" "${SYSTEM_PACKAGES[@]}"
+install_package_group() {
+    local group_name="$1"
+    shift
+    local packages=("$@")
+
+    if [ ${#packages[@]} -eq 0 ]; then
+        log_warning "No hay paquetes para instalar en el grupo $group_name"
+        return 0
+    }
+
+    log_info "Instalando grupo de paquetes: $group_name"
+    log_info "Paquetes a instalar: ${packages[*]}"
+
+    # Intentar instalar
+    if ! install_packages "${packages[@]}"; then
+        log_error "Error instalando grupo $group_name"
+        return 1
+    fi
+
+    # Verificar instalación
+    local failed=0
+    for package in "${packages[@]}"; do
+        if ! is_package_installed "$package"; then
+            log_error "Verificación fallida para: $package"
+            ((failed++))
+        else
+            log_success "Verificado: $package"
+        fi
+    done
+
+    if [ $failed -eq 0 ]; then
+        log_success "Instalación de $group_name completada exitosamente"
+        return 0
+    else
+        log_error "Instalación de $group_name completada con $failed errores"
+        return 1
+    fi
+}
+
+# Función para verificar grupo de paquetes
+# Uso: verify_package_group <nombre_grupo> <paquetes...>
+# Ejemplo:
+#   verify_package_group "php" "php8.1-cli" "php8.1-fpm" "php8.1-mysql"
+#   verify_package_group "base" "${SYSTEM_PACKAGES[@]}"
+verify_package_group() {
+    local group_name="$1"
+    shift
+    local packages=("$@")
+    local failed=0
+
+    if [ ${#packages[@]} -eq 0 ]; then
+        log_warning "No hay paquetes para verificar en el grupo $group_name"
+        return 0
+    }
+
+    log_info "Verificando grupo de paquetes: $group_name"
+
+    for package in "${packages[@]}"; do
+        if ! is_package_installed "$package"; then
+            log_error "No instalado: $package"
+            ((failed++))
+            continue
+        fi
+
+        # Si el paquete tiene una versión específica requerida
+        if [[ " ${PACKAGE_VERSIONS[*]} " =~ " ${package}:"* ]]; then
+            local version_spec
+            version_spec=$(echo "${PACKAGE_VERSIONS[@]}" | grep -o "${package}:[^ ]*")
+            if ! verify_package_versions "$version_spec"; then
+                ((failed++))
+            fi
+        fi
+    done
+
+    if [ $failed -eq 0 ]; then
+        log_success "Verificación de $group_name completada exitosamente"
+        return 0
+    else
+        log_error "Verificación de $group_name completada con $failed errores"
+        return 1
+    fi
+}
+
+# Función para preparar el entorno de paquetes
+# Uso: prepare_package_environment
+# Ejemplo:
+#   if prepare_package_environment; then
+#       install_packages ...
+#   fi
+prepare_package_environment() {
+    log_info "Preparando entorno de paquetes..."
+
+    # Limpiar locks de dpkg
+    if ! cleanup_dpkg_locks; then
+        log_error "Error limpiando locks de dpkg"
+        return 1
+    fi
+
+    # Configurar dpkg para instalación no interactiva
+    export DEBIAN_FRONTEND=noninteractive
+
+    # Reparar dependencias rotas si existen
+    if ! dpkg --configure -a; then
+        log_error "Error configurando paquetes pendientes"
+        return 1
+    fi
+
+    # Actualizar índices de paquetes
+    if ! apt_update; then
+        log_error "Error actualizando índices de paquetes"
+        return 1
+    fi
+
+    log_success "Entorno de paquetes preparado correctamente"
+    return 0
+}
+
+# Función para limpiar después de instalación de paquetes
+# Uso: cleanup_after_install [mantener_cache]
+# Ejemplo:
+#   cleanup_after_install        # Limpieza completa
+#   cleanup_after_install true   # Mantener cache de apt
+cleanup_after_install() {
+    local keep_cache="${1:-false}"
+    log_info "Limpiando después de instalación..."
+
+    # Remover paquetes huérfanos
+    if ! apt-get autoremove -y; then
+        log_warning "Error removiendo paquetes huérfanos"
+    fi
+
+    # Limpiar archivos temporales de dpkg
+    cleanup_dpkg_locks
+
+    # Limpiar cache de apt si no se especifica mantenerla
+    if [ "$keep_cache" != "true" ]; then
+        if ! apt_clean; then
+            log_warning "Error limpiando cache de apt"
+        fi
+    fi
+
+    log_success "Limpieza post-instalación completada"
+    return 0
+}
+
+
 # Función para configurar paquetes instalados
 # Uso: configure_installed_packages <tipo> [configuración]
 # Ejemplo:
