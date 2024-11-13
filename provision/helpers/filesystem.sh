@@ -267,6 +267,23 @@ safe_remove() {
     return 0
 }
 
+# Verificar existencia y permisos de directorios
+# Uso: verify_directories <lista_directorios>
+# Ejemplo: verify_directories "/var/log /var/www"
+verify_directories() {
+    local dirs=("$@")
+    local failed=0
+
+    for dir in "${dirs[@]}"; do
+        if [ ! -d "$dir" ]; then
+            log_error "Directorio no existe: $dir"
+            ((failed++))
+        fi
+    done
+
+    return $failed
+}
+
 # Establecer permisos recursivamente
 # Uso: set_permissions <ruta> [modo_archivo] [modo_dir] [propietario] [grupo]
 # Ejemplo:

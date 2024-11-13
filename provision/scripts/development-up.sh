@@ -95,7 +95,8 @@ main() {
     setup_system_users
     setup_base_directories
 
-    log_success "Configuración post-arranque completada exitosamente"
+    log_su
+    ccess "Configuración post-arranque completada exitosamente"
 }
 
 # Ejecutar script

@@ -451,7 +451,353 @@ system_verify_systemd() {
     fi
 }
 
+# Verificar versión de software
+# Uso: verify_software_version <comando> <versión_requerida> [patrón_versión] [descripción]
+# Ejemplo:
+#   verify_software_version "php" "8.1" "-v | head -n1" "PHP"
+#   verify_software_version "mysql" "8.0" "--version" "MySQL Server"
+verify_software_version() {
+    local command="$1"
+    local required_version="$2"
+    local version_pattern="${3:---version}"
+    local description="${4:-$command}"
 
+    log_info "Verificando versión de $description..."
+
+    # Verificar si el software está instalado
+    if ! command -v "$command" >/dev/null; then
+        log_error "$description no está instalado"
+        return 1
+    }
+
+    # Obtener versión actual
+    local current_version
+    current_version=$($command $version_pattern 2>/dev/null)
+    if [ $? -ne 0 ]; then
+        log_error "No se pudo determinar la versión de $description"
+        return 1
+    }
+
+    # Verificar versión
+    if [[ ! "$current_version" =~ $required_version ]]; then
+        log_error "Versión de $description incorrecta"
+        log_error "Esperada: $required_version"
+        log_error "Actual: $current_version"
+        return 1
+    }
+
+    log_success "Versión de $description correcta: $current_version"
+    return 0
+}
+
+# Verificar extensiones/módulos de software
+# Uso: verify_software_modules <comando> <módulos...> [comando_lista] [descripción]
+# Ejemplo:
+#   verify_software_modules "php" "mysqli pdo xml" "-m" "PHP"
+#   verify_software_modules "apache2" "rewrite ssl" "-M" "Apache"
+verify_software_modules() {
+    local command="$1"
+    local modules=("${@:2}")
+    local list_command="${3:-}"
+    local description="${4:-$command}"
+    local missing=()
+    local installed=()
+
+    log_info "Verificando módulos de $description..."
+
+    # Verificar si el software está instalado
+    if ! command -v "$command" >/dev/null; then
+        log_error "$description no está instalado"
+        return 1
+    }
+
+    # Obtener lista de módulos
+    local module_list
+    if [ -n "$list_command" ]; then
+        module_list=$($command $list_command 2>/dev/null)
+    else
+        module_list=$($command --help 2>/dev/null)
+    fi
+
+    # Verificar cada módulo
+    for module in "${modules[@]}"; do
+        if echo "$module_list" | grep -q "$module"; then
+            installed+=("$module")
+        else
+            missing+=("$module")
+        fi
+    done
+
+    # Mostrar resultados
+    if [ ${#missing[@]} -gt 0 ]; then
+        log_error "Módulos faltantes de $description: ${missing[*]}"
+        return 1
+    fi
+
+    log_success "Todos los módulos requeridos de $description están instalados"
+    return 0
+}
+
+# Verificar configuración de software
+# Uso: verify_software_config <archivo_config> <directivas...>
+# Ejemplo:
+#   verify_software_config "/etc/php/8.1/fpm/php.ini" "memory_limit=256M" "max_execution_time=300"
+#   verify_software_config "/etc/mysql/my.cnf" "max_connections=100"
+verify_software_config() {
+    local config_file="$1"
+    shift
+    local directives=("$@")
+    local errors=0
+
+    log_info "Verificando archivo de configuración: $config_file"
+
+    # Verificar existencia del archivo
+    if [ ! -f "$config_file" ]; then
+        log_error "Archivo de configuración no encontrado: $config_file"
+        return 1
+    }
+
+    # Verificar cada directiva
+    for directive in "${directives[@]}"; do
+        local key="${directive%%=*}"
+        local value="${directive#*=}"
+
+        if ! grep -q "^[[:space:]]*$key[[:space:]]*=[[:space:]]*$value" "$config_file"; then
+            log_error "Directiva no encontrada o incorrecta: $key = $value"
+            ((errors++))
+        fi
+    done
+
+    if [ $errors -eq 0 ]; then
+        log_success "Todas las directivas verificadas correctamente"
+        return 0
+    else
+        log_error "Se encontraron $errors errores en la configuración"
+        return 1
+    fi
+}
+
+# Verificar variables de entorno
+# Uso: verify_environment_variables [modo] <variables...>
+# Ejemplo:
+#   verify_environment_variables "required" "PATH" "HOME" "USER"
+#   verify_environment_variables "valued" "PATH=/usr/bin" "LANG=en_US.UTF-8"
+verify_environment_variables() {
+    local mode="${1:-required}"
+    shift
+    local variables=("$@")
+    local errors=0
+
+    log_info "Verificando variables de entorno..."
+
+    case "$mode" in
+        "required")
+            # Verificar solo existencia
+            for var in "${variables[@]}"; do
+                if [ -z "${!var+x}" ]; then
+                    log_error "Variable requerida no definida: $var"
+                    ((errors++))
+                fi
+            done
+            ;;
+        "valued")
+            # Verificar valor específico
+            for var in "${variables[@]}"; do
+                local key="${var%%=*}"
+                local value="${var#*=}"
+                if [ "${!key}" != "$value" ]; then
+                    log_error "Variable $key tiene valor incorrecto"
+                    log_error "Esperado: $value"
+                    log_error "Actual: ${!key}"
+                    ((errors++))
+                fi
+            done
+            ;;
+        *)
+            log_error "Modo de verificación no válido: $mode"
+            return 1
+            ;;
+    esac
+
+    if [ $errors -eq 0 ]; then
+        log_success "Todas las variables de entorno verificadas correctamente"
+        return 0
+    else
+        log_error "Se encontraron $errors errores en las variables de entorno"
+        return 1
+    fi
+}
+
+# Verificar estado del entorno
+# Uso: verify_environment_state <tipo_ambiente> <verificaciones...>
+# Ejemplo:
+#   verify_environment_state "production" "debug=false" "errors=log" "display_errors=0"
+#   verify_environment_state "development" "debug=true" "errors=display"
+verify_environment_state() {
+    local env_type="$1"
+    shift
+    local checks=("$@")
+    local errors=0
+
+    log_info "Verificando estado del ambiente: $env_type"
+
+    # Verificar cada condición del ambiente
+    for check in "${checks[@]}"; do
+        local key="${check%%=*}"
+        local expected="${check#*=}"
+        local actual
+
+        # Intentar obtener valor actual según el tipo de verificación
+        case "$key" in
+            *_file)
+                if [ ! -f "$expected" ]; then
+                    log_error "Archivo requerido no existe: $expected"
+                    ((errors++))
+                fi
+                ;;
+            *_dir)
+                if [ ! -d "$expected" ]; then
+                    log_error "Directorio requerido no existe: $expected"
+                    ((errors++))
+                fi
+                ;;
+            *_permission)
+                local path="${expected%%:*}"
+                local perm="${expected#*:}"
+                if ! verify_file_permission "$path" "$perm"; then
+                    ((errors++))
+                fi
+                ;;
+            *)
+                if ! verify_environment_variables "valued" "${key}=${expected}"; then
+                    ((errors++))
+                fi
+                ;;
+        esac
+    done
+
+    if [ $errors -eq 0 ]; then
+        log_success "Estado del ambiente $env_type verificado correctamente"
+        return 0
+    else
+        log_error "Se encontraron $errors errores en el estado del ambiente"
+        return 1
+    fi
+}
+
+# Verificar requisitos del sistema de forma abstracta
+# Uso: verify_system_condition <tipo> <condición> [args...]
+# Tipos soportados: resource, version, state, limit
+# Ejemplo:
+#   verify_system_condition "resource" "memory" "1024" "MB"
+#   verify_system_condition "version" "os" "Ubuntu" "22.04"
+#   verify_system_condition "state" "load" "0.8"
+#   verify_system_condition "limit" "nofile" "65535"
+verify_system_condition() {
+    local check_type="$1"
+    local condition="$2"
+    shift 2
+    local args=("$@")
+
+    case "$check_type" in
+        "resource")
+            case "$condition" in
+                "memory")
+                    local min_memory="${args[0]}"
+                    local current_memory=$(get_total_memory)
+                    if [ "$current_memory" -lt "$min_memory" ]; then
+                        log_error "Memoria insuficiente: ${current_memory}${args[1]} (mínimo: ${min_memory}${args[1]})"
+                        return 1
+                    fi
+                    ;;
+                "cpu")
+                    local min_cores="${args[0]}"
+                    local current_cores=$(get_cpu_cores)
+                    if [ "$current_cores" -lt "$min_cores" ]; then
+                        log_error "Núcleos CPU insuficientes: $current_cores (mínimo: $min_cores)"
+                        return 1
+                    fi
+                    ;;
+                "disk")
+                    local min_space="${args[0]}"
+                    local mount_point="${args[1]:-/}"
+                    if ! check_disk_space "$min_space" "$mount_point"; then
+                        return 1
+                    fi
+                    ;;
+                *)
+                    log_error "Tipo de recurso no soportado: $condition"
+                    return 1
+                    ;;
+            esac
+            ;;
+        "version")
+            case "$condition" in
+                "os")
+                    local os_name="${args[0]}"
+                    local os_version="${args[1]}"
+                    if ! check_os_version "$os_name" "$os_version"; then
+                        return 1
+                    fi
+                    ;;
+                "kernel")
+                    local min_version="${args[0]}"
+                    local current_version=$(uname -r)
+                    if ! verify_version "$current_version" "$min_version"; then
+                        log_error "Versión de kernel no soportada: $current_version (mínimo: $min_version)"
+                        return 1
+                    fi
+                    ;;
+                *)
+                    log_error "Tipo de versión no soportada: $condition"
+                    return 1
+                    ;;
+            esac
+            ;;
+        "state")
+            case "$condition" in
+                "load")
+                    local max_load="${args[0]}"
+                    local current_load=$(get_load_average)
+                    if (( $(echo "$current_load > $max_load" | bc -l) )); then
+                        log_warning "Carga del sistema elevada: $current_load (máximo: $max_load)"
+                        return 1
+                    fi
+                    ;;
+                "throttling")
+                    if ! check_cpu_throttling; then
+                        log_warning "CPU en estado de throttling"
+                        return 1
+                    fi
+                    ;;
+                *)
+                    log_error "Tipo de estado no soportado: $condition"
+                    return 1
+                    ;;
+            esac
+            ;;
+        "limit")
+            case "$condition" in
+                "nofile"|"nproc"|"memlock")
+                    local limit_value="${args[0]}"
+                    if ! verify_system_limit "$condition" "$limit_value"; then
+                        return 1
+                    fi
+                    ;;
+                *)
+                    log_error "Tipo de límite no soportado: $condition"
+                    return 1
+                    ;;
+            esac
+            ;;
+        *)
+            log_error "Tipo de verificación no soportado: $check_type"
+            return 1
+            ;;
+    esac
+
+    return 0
+}
 
 # Ejemplo de uso completo del script
 : '

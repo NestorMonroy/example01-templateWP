@@ -217,6 +217,26 @@ backup_environment() {
     log_success "Backup creado en: $backup_dir"
 }
 
+# Verificación completa del ambiente
+# Uso: verify_complete_environment <tipo_ambiente>
+# Ejemplo: verify_complete_environment "production"
+verify_complete_environment() {
+    local env_type="$1"
+    local failed=0
+
+    # Verificar variables requeridas
+    if ! verify_environment_variables "required" "${REQUIRED_ENV_VARS[$env_type]}"; then
+        ((failed++))
+    fi
+
+    # Verificar directorios requeridos
+    if ! verify_directories "${REQUIRED_DIRECTORIES[$env_type]}"; then
+        ((failed++))
+    fi
+
+    return $failed
+}
+
 # Función para restaurar un backup
 # Uso: restore_environment <timestamp>
 # Ejemplo:

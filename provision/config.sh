@@ -237,7 +237,168 @@ export VERIFY_CONFIGS=true
 export VERIFY_DEPENDENCIES=true
 export VERIFY_AUTO_START=true
 
-# Número máximo de reintentos para verificaciones
+# Requisitos del sistema y verificaciones
+declare -A SYSTEM_REQUIREMENTS=(
+    # Recursos (consolidando las variables existentes)
+    ["MEMORY_MIN"]="${MIN_MEMORY_MB}"
+    ["CPU_CORES_MIN"]="${MIN_CPU_CORES}"
+    ["DISK_SPACE_MIN"]="${MIN_DISK_SPACE_MB}"
+    # Nuevos valores
+    ["LOAD_MAX"]="0.8"
+    ["OS_VERSION"]="22.04"
+    ["KERNEL_MIN"]="5.4"
+    ["ARCH"]="x86_64"
+)
+
+
+#unset MIN_MEMORY_MB MIN_CPU_CORES MIN_DISK_SPACE_MB
+# Requisitos de software
+declare -A SOFTWARE_REQUIREMENTS=(
+    # Consolidando versiones existentes
+    ["php"]="${PHP_VERSION}"
+    ["mysql"]="${MYSQL_VERSION}"
+    ["wordpress"]="${WP_VERSION}"
+    # Agregando nuevas
+    ["nginx"]="1.18"
+    ["apache2"]="2.4"
+)
+
+# Mantener variables originales para compatibilidad
+export PHP_VERSION="${SOFTWARE_REQUIREMENTS[php]}"
+export MYSQL_VERSION="${SOFTWARE_REQUIREMENTS[mysql]}"
+export WP_VERSION="${SOFTWARE_REQUIREMENTS[wordpress]}"
+
+# Comandos para verificar versiones
+declare -A VERSION_COMMANDS=(
+    ["php"]="-v | head -n1"
+    ["mysql"]="--version"
+    ["nginx"]="-v 2>&1"
+    ["apache2"]="-v | head -n1"
+)
+
+# Variables de entorno requeridas por ambiente
+declare -A REQUIRED_ENV_VARS=(
+    # Variables base (requeridas en todos los ambientes)
+    ["BASE"]="PROJECT_DIR PROVISION_DIR LOGS_DIR TEMP_DIR PATH"
+    # Variables específicas de producción
+    ["PRODUCTION"]="APP_ENV=production DEBUG=false"
+    # Variables específicas de desarrollo
+    ["DEVELOPMENT"]="APP_ENV=development DEBUG=true"
+)
+
+# Directorios requeridos por ambiente
+declare -A REQUIRED_DIRECTORIES=(
+    # Directorios base
+    ["BASE"]="${PROJECT_DIR} ${PROVISION_DIR} ${LOGS_DIR} ${TEMP_DIR}"
+    # Directorios de aplicación
+    ["APP"]="${WORDPRESS_PATH} ${WORDPRESS_PATH}/wp-content"
+    # Directorios de datos
+    ["DATA"]="${BACKUP_PATH} ${PROVISION_DIR}/data"
+    # Directorios de cache
+    ["CACHE"]="${TEMP_DIR}/cache ${PROJECT_DIR}/cache"
+)
+
+# Permisos y ownership requeridos
+declare -A DIRECTORY_PERMISSIONS=(
+    # Formato: "ruta:permisos:usuario:grupo"
+    ["${WORDPRESS_PATH}"]="755:www-data:www-data"
+    ["${WORDPRESS_PATH}/wp-content"]="775:www-data:www-data"
+    ["${WORDPRESS_PATH}/wp-content/uploads"]="775:www-data:www-data"
+    ["${LOGS_DIR}"]="755:root:root"
+    ["${TEMP_DIR}"]="755:root:root"
+)
+
+# Módulos requeridos por software
+declare -A REQUIRED_MODULES=(
+    # PHP
+    ["php"]="mysqli pdo pdo_mysql json xml mbstring gd curl zip"
+    # Apache
+    ["apache2"]="rewrite ssl headers env"
+    # Nginx
+    ["nginx"]="http_ssl_module http_rewrite_module"
+)
+
+# Estados de servicio requeridos
+declare -A SERVICE_STATES=(
+    # Formato: "servicio:estado:habilitado"
+    ["php-fpm"]="running:true"
+    ["mysql"]="running:true"
+    ["nginx"]="running:true"
+    ["apache2"]="stopped:false"
+)
+
+# Verificaciones de red
+declare -A NETWORK_CHECKS=(
+    # Puertos requeridos
+    ["ports"]="80:tcp 443:tcp 3306:tcp 9000:tcp"
+    # Conectividad externa
+    ["connectivity"]="8.8.8.8 ubuntu.com github.com"
+    # Resolución DNS
+    ["dns"]="localhost wordpress.org github.com"
+)
+
+# Verificaciones de ambiente
+declare -A ENVIRONMENT_CHECKS=(
+    # Producción
+    ["production"]="
+        debug=false
+        display_errors=Off
+        error_reporting=E_ALL & ~E_DEPRECATED
+        log_errors=On
+        error_log=/var/log/php/error.log
+    "
+    # Desarrollo
+    ["development"]="
+        debug=true
+        display_errors=On
+        error_reporting=E_ALL
+        log_errors=On
+        error_log=/var/log/php/error.log
+    "
+)
+
+# Tiempos máximos de espera para verificaciones
+declare -A VERIFICATION_TIMEOUTS=(
+    ["service"]="30"    # Segundos para esperar servicios
+    ["port"]="10"       # Segundos para esperar puertos
+    ["network"]="5"     # Segundos para pruebas de red
+    ["database"]="20"   # Segundos para conexión BD
+)
+
+# Intentos máximos para verificaciones
+declare -A VERIFICATION_RETRIES=(
+    ["service"]="3"     # Intentos para servicios
+    ["port"]="3"        # Intentos para puertos
+    ["network"]="2"     # Intentos para red
+    ["database"]="2"    # Intentos para BD
+)
+
+# Rutas de verificación
+declare -A VERIFICATION_PATHS=(
+    # Logs de verificación
+    ["logs"]="${LOGS_DIR}/verification"
+    # Estado de verificaciones
+    ["state"]="${PROVISION_DIR}/state/verify"
+    # Resultados de verificación
+    ["results"]="${LOGS_DIR}/results"
+)
+
+# Mensajes personalizados de verificación
+declare -A VERIFICATION_MESSAGES=(
+    ["success"]="Verificación completada exitosamente"
+    ["warning"]="Verificación completada con advertencias"
+    ["error"]="Verificación fallida"
+)
+
+# Reglas de verificación por tipo de despliegue
+declare -A DEPLOYMENT_RULES=(
+    # Producción - todas las verificaciones
+    ["production"]="system software network services environment security"
+    # Staging - verificaciones básicas
+    ["staging"]="system software network services"
+    # Desarrollo - verificaciones mínimas
+    ["development"]="system software"
+)
 
 
 # Función para inicializar el entorno
