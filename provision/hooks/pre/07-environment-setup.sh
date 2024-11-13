@@ -42,7 +42,7 @@ validate_provision_environment() {
     if ! verify_complete_environment "BASE"; then
         error_handle "Ambiente base no inicializado correctamente" ${ERROR_CODES["INVALID_CONFIG"]}
         return 1
-    fi
+    }
 
     # 1.3 Verificar requisitos del sistema
     log_info "Verificando requisitos del sistema..."

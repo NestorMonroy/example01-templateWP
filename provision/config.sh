@@ -249,7 +249,32 @@ declare -A SYSTEM_REQUIREMENTS=(
     ["KERNEL_MIN"]="5.4"
     ["ARCH"]="x86_64"
 )
+# Configuraciones de Composer
+declare -A COMPOSER_CONFIG=(
+    ["version"]="2.6.5"
+    ["checksum"]="sha384-..."
+    ["download_url"]="https://getcomposer.org/installer"
+    ["bin_path"]="/usr/local/bin/composer"
+)
 
+# Requerimientos de Composer y PHP
+declare -A PHP_DEVELOPMENT_CONFIG=(
+    ["memory_limit"]="2G"
+    ["max_execution_time"]="300"
+    ["display_errors"]="On"
+    ["error_reporting"]="E_ALL"
+    ["opcache.enable"]="0"
+)
+
+# Extensiones requeridas para Composer + WordPress
+export PHP_REQUIRED_EXTENSIONS=(
+    "curl"
+    "json"
+    "mbstring"
+    "openssl"
+    "xml"
+    "zip"
+)
 
 #unset MIN_MEMORY_MB MIN_CPU_CORES MIN_DISK_SPACE_MB
 # Requisitos de software

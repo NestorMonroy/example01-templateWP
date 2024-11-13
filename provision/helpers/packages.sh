@@ -611,6 +611,37 @@ configure_installed_packages() {
     fi
 }
 
+# Función para verificar extensiones PHP
+# Uso: verify_php_extensions [extensión1] [extensión2] ...
+# Ejemplo:
+#   verify_php_extensions "mbstring" "xml" "json"
+verify_php_extensions() {
+    local extensions=("$@")
+    local missing=()
+
+    log_info "Verificando extensiones PHP..."
+
+    # Verificar que PHP está instalado
+    if ! command -v php >/dev/null; then
+        log_error "PHP no está instalado"
+        return 1
+    }
+
+    # Verificar cada extensión
+    for ext in "${extensions[@]}"; do
+        if ! php -m | grep -q "^$ext$"; then
+            missing+=("$ext")
+        fi
+    done
+
+    if [ ${#missing[@]} -gt 0 ]; then
+        log_error "Extensiones PHP faltantes: ${missing[*]}"
+        return 1
+    fi
+
+    log_success "Todas las extensiones PHP requeridas están instaladas"
+    return 0
+}
 
 
 # Ejemplo de uso completo del script
