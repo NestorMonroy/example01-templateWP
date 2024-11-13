@@ -326,6 +326,142 @@ unhold_package() {
     return 0
 }
 
+# Agregar después de las funciones existentes en packages.sh
+
+# Función para validar el sistema completo de paquetes
+# Uso: validate_package_system
+# Ejemplo:
+#   if validate_package_system; then
+#       echo "Sistema de paquetes OK"
+#   fi
+validate_package_system() {
+    log_info "Validando sistema de paquetes..."
+
+    # Verificar y limpiar locks
+    cleanup_dpkg_locks
+
+    # Verificar base de datos de dpkg
+    if ! dpkg --configure -a &>/dev/null; then
+        log_error "Base de datos de dpkg corrupta"
+        return 1
+    }
+
+    # Verificar sources.list
+    if [ ! -f "/etc/apt/sources.list" ]; then
+        log_error "sources.list no encontrado"
+        return 1
+    }
+
+    # Verificar repositorios
+    if ! apt_update; then
+        log_error "No se puede acceder a los repositorios"
+        return 1
+    }
+
+    log_success "Sistema de paquetes validado correctamente"
+    return 0
+}
+
+# Función para verificar versiones específicas de paquetes
+# Uso: verify_package_versions [paquete:versión] ...
+# Ejemplo:
+#   verify_package_versions "php:8.1" "mysql:8.0"
+verify_package_versions() {
+    local packages=("$@")
+    local failed=0
+
+    log_info "Verificando versiones de paquetes..."
+
+    for package_spec in "${packages[@]}"; do
+        local package_name=${package_spec%%:*}
+        local required_version=${package_spec#*:}
+
+        if ! is_package_installed "$package_name"; then
+            log_error "Paquete no instalado: $package_name"
+            ((failed++))
+            continue
+        }
+
+        local installed_version
+        installed_version=$(dpkg-query -W -f='${Version}' "$package_name" 2>/dev/null)
+
+        if [[ ! "$installed_version" =~ ^$required_version ]]; then
+            log_error "Versión incorrecta de $package_name: $installed_version (requerida: $required_version)"
+            ((failed++))
+        else
+            log_success "Versión correcta de $package_name: $installed_version"
+        fi
+    done
+
+    return $failed
+}
+
+# Función para configurar paquetes instalados
+# Uso: configure_installed_packages <tipo> [configuración]
+# Ejemplo:
+#   configure_installed_packages "php" "memory_limit=256M max_execution_time=300"
+#   configure_installed_packages "mysql" "max_connections=100"
+configure_installed_packages() {
+    local package_type="$1"
+    local configs="${2:-}"
+    local config_file=""
+    local modified=0
+
+    log_info "Configurando $package_type..."
+
+    case "$package_type" in
+        "php")
+            local php_version="${PHP_VERSION:-8.1}"
+            config_file="/etc/php/$php_version/fpm/php.ini"
+            ;;
+        "mysql")
+            config_file="/etc/mysql/mysql.conf.d/mysqld.cnf"
+            ;;
+        "nginx")
+            config_file="/etc/nginx/nginx.conf"
+            ;;
+        *)
+            log_error "Tipo de paquete no soportado: $package_type"
+            return 1
+            ;;
+    esac
+
+    # Verificar archivo de configuración
+    if [ ! -f "$config_file" ]; then
+        log_error "Archivo de configuración no encontrado: $config_file"
+        return 1
+    }
+
+    # Hacer backup del archivo de configuración
+    if ! safe_copy "$config_file" "${config_file}.bak" true; then
+        log_error "No se pudo crear backup de $config_file"
+        return 1
+    }
+
+    # Aplicar configuraciones
+    IFS=' ' read -ra config_array <<< "$configs"
+    for config in "${config_array[@]}"; do
+        local key="${config%%=*}"
+        local value="${config#*=}"
+
+        # Usar search_replace del filesystem.sh
+        if search_replace "$config_file" "^$key.*" "$key = $value" true; then
+            ((modified++))
+            log_info "Configuración actualizada: $key = $value"
+        fi
+    done
+
+    if [ $modified -gt 0 ]; then
+        log_success "Configuración de $package_type actualizada ($modified cambios)"
+        return 0
+    else
+        log_warning "No se realizaron cambios en la configuración de $package_type"
+        return 1
+    fi
+}
+
+
+
 # Ejemplo de uso completo del script
 : '
 #!/bin/bash
@@ -370,6 +506,9 @@ apt_clean
 #export -f add_apt_repository
 #export -f hold_package
 #export -f unhold_package
+#export -f validate_package_system
+#export -f verify_package_versions
+#export -f configure_installed_packages
 
 # Inicialización del módulo
 # Actualizar la lista de paquetes silenciosamente al cargar el script
