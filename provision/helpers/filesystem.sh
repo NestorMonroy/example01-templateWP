@@ -62,17 +62,36 @@ is_file() {
     [ -f "$path" ]
 }
 
-# Verificar si es un enlace simbólico
-# Uso: is_symlink <ruta>
+# Verificar si es un enlace simbólico y opcionalmente su target
+# Uso: is_symlink <ruta> [target_esperado]
 # Ejemplo:
 #   if is_symlink "/var/www/html"; then
 #       echo "Es un enlace simbólico"
 #   fi
+#   if is_symlink "/var/www/html" "/var/www/wordpress"; then
+#       echo "Enlace apunta al target correcto"
+#   fi
 is_symlink() {
     local path="$1"
-    [ -L "$path" ]
-}
+    local expected_target="$2"
 
+    # Verificar si es un enlace simbólico
+    if [ ! -L "$path" ]; then
+        return 1
+    fi
+
+    # Si se especificó un target, verificarlo
+    if [ -n "$expected_target" ]; then
+        local current_target
+        current_target=$(readlink "$path")
+        if [ "$current_target" != "$expected_target" ]; then
+            log_error "Enlace $path apunta a $current_target (esperado: $expected_target)"
+            return 1
+        fi
+    fi
+
+    return 0
+}
 # Crear un directorio si no existe
 # Uso: ensure_directory <directorio> [modo] [propietario] [grupo]
 # Ejemplo:

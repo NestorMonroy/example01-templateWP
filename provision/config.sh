@@ -276,6 +276,46 @@ export PHP_REQUIRED_EXTENSIONS=(
     "zip"
 )
 
+# Estructura de directorios requerida
+declare -A DIRECTORY_STRUCTURE=(
+    ["wordpress"]="${WORDPRESS_PATH}"
+    ["content"]="${WORDPRESS_PATH}/wp-content"
+    ["uploads"]="${WORDPRESS_PATH}/wp-content/uploads"
+    ["plugins"]="${WORDPRESS_PATH}/wp-content/plugins"
+    ["themes"]="${WORDPRESS_PATH}/wp-content/themes"
+    ["logs"]="${LOGS_DIR}"
+    ["cache"]="${PROJECT_DIR}/cache"
+    ["temp"]="${TEMP_DIR}"
+)
+
+# Permisos y ownership de directorios
+declare -A DIRECTORY_PERMISSIONS=(
+    ["${WORDPRESS_PATH}"]="755:www-data:www-data"
+    ["${WORDPRESS_PATH}/wp-content"]="775:www-data:www-data"
+    ["${WORDPRESS_PATH}/wp-content/uploads"]="775:www-data:www-data"
+    ["${WORDPRESS_PATH}/wp-content/plugins"]="755:www-data:www-data"
+    ["${WORDPRESS_PATH}/wp-content/themes"]="755:www-data:www-data"
+    ["${LOGS_DIR}"]="755:root:root"
+    ["${PROJECT_DIR}/cache"]="775:www-data:www-data"
+    ["${TEMP_DIR}"]="755:root:root"
+)
+
+# Enlaces simbólicos requeridos
+declare -A REQUIRED_SYMLINKS=(
+    ["${WORDPRESS_PATH}"]="/var/www/html"
+    ["${LOGS_DIR}/nginx"]="/var/log/nginx"
+    ["${LOGS_DIR}/php"]="/var/log/php"
+)
+
+# Espacio mínimo requerido por directorio (en MB)
+declare -A DIRECTORY_SPACE_REQUIREMENTS=(
+    ["wordpress"]=100
+    ["uploads"]=500
+    ["logs"]=200
+    ["cache"]=100
+    ["temp"]=200
+)
+
 #unset MIN_MEMORY_MB MIN_CPU_CORES MIN_DISK_SPACE_MB
 # Requisitos de software
 declare -A SOFTWARE_REQUIREMENTS=(
